@@ -1,105 +1,69 @@
-# 🚀 Deployment Guide — Crime Hotspot Prediction
+# 🚀 Vercel Deployment Guide — Crime Hotspot Prediction
 
-This guide provides step-by-step instructions to deploy your Streamlit Geospatial ML application to the cloud for free.
+This application is configured for deployment on **Vercel** with a high-performance **Python Serverless API** (`api/index.py`) and a modern **interactive Leaflet / Tailwind frontend** (`public/index.html`).
 
 ---
 
-## 🌟 Method 1: Streamlit Community Cloud (Recommended & Easiest)
+## 🌟 Deploy on Vercel (1-Click & 100% Free)
 
-Streamlit Community Cloud is **100% free**, officially maintained by Streamlit, and provides automatic continuous deployment whenever you push changes to GitHub.
+### Step 1: Push latest code to GitHub
 
-### Step 1: Initialize Git and Push to GitHub
+In your PowerShell / terminal:
 
-Open a terminal (PowerShell or Bash) in the `crime_hotspot_prediction` folder:
-
-```bash
+```powershell
+# 1. Navigate into the project folder
 cd "crime_hotspot_prediction"
 
-# Initialize git repository (if not already done)
-git init
+# 2. Stage all files
 git add .
-git commit -m "Initial commit: Crime Hotspot Prediction App"
 
-# Rename branch to main
-git branch -M main
+# 3. Commit changes
+git commit -m "Deploy: Full-Stack Vercel Serverless Architecture"
 
-# Add your GitHub remote repository (replace with your repo URL)
-git remote add origin https://github.com/<your-username>/<your-repo-name>.git
-
-# Push to GitHub
-git push -u origin main
+# 4. Push to GitHub
+git push origin main
 ```
 
-### Step 2: Deploy on Streamlit Cloud
+---
 
-1. Go to **[share.streamlit.io](https://share.streamlit.io)** and sign in with your GitHub account.
-2. Click **"New app"** (or **"Create app"**).
-3. Select **"Use existing repo"**.
-4. Configure the deployment settings:
-   - **Repository:** `<your-username>/<your-repo-name>`
-   - **Branch:** `main`
-   - **Main file path:** `app.py`
-5. Click **"Deploy!"**
-6. Streamlit Cloud will automatically build your app and generate a live public URL (e.g., `https://crime-hotspot-prediction.streamlit.app`).
+### Step 2: Deploy in Vercel Dashboard
+
+1. Go to **[vercel.com](https://vercel.com)** and log in with your GitHub account.
+2. Click **"Add New..."** → **"Project"**.
+3. Under **Import Git Repository**, find:
+   `sujatha04/Geospatial-Machine-Learning-Framework-for-Crime-Hotspot-Prediction`
+4. Click **"Import"**.
+5. Configure the project:
+   - **Framework Preset:** Leave as `Other`
+   - **Root Directory:** Leave as `./` (or click Edit and select `./` if prompted)
+6. Click **"Deploy"**!
+
+Within ~45 seconds, Vercel will build your serverless backend and provide a permanent global live URL (e.g., `https://geospatial-machine-learning-framework-for-crime-hotspot.vercel.app`).
 
 ---
 
-## ☁️ Method 2: Render (Free Web Service / Docker)
+## 💻 Local Testing & Development
 
-Render offers a free tier for hosting web applications.
+You can run the full-stack web application locally using Python:
 
-### Option A: Using Git Repository
-1. Push your code to GitHub as shown in Method 1.
-2. Go to **[render.com](https://render.com)** and sign in.
-3. Click **"New +"** → **"Web Service"**.
-4. Connect your GitHub repository.
-5. Set:
-   - **Environment:** `Python`
-   - **Build Command:** `pip install -r requirements.txt`
-   - **Start Command:** `streamlit run app.py --server.port $PORT --server.address 0.0.0.0`
-6. Choose the **Free** instance type and click **"Create Web Service"**.
+```powershell
+cd crime_hotspot_prediction
+..\venv\Scripts\python.exe api/index.py
+```
+Open `http://localhost:5000` or open `public/index.html` in your browser!
 
----
-
-## 🤗 Method 3: Hugging Face Spaces (Free ML Hosting)
-
-Hugging Face Spaces supports Streamlit apps out of the box with dedicated hardware.
-
-1. Create a free account at **[huggingface.co](https://huggingface.co)**.
-2. Click **"New Space"**.
-3. Choose:
-   - **Space SDK:** `Streamlit`
-   - **License:** `MIT` / `Apache 2.0`
-   - **Space hardware:** `Free (CPU basic)`
-4. Clone the space repository locally or upload your files (`app.py`, `pages/`, `src/`, `utils/`, `data/`, `models/`, `requirements.txt`).
-5. Hugging Face will automatically install `requirements.txt` and run `app.py`.
-
----
-
-## 🐳 Method 4: Docker Container (Local / AWS / DigitalOcean / GCP)
-
-A ready-to-use [`Dockerfile`](file:///c:/Users/sujathathennarasu/Documents/AI&DS(VIPS.Tech)/Team%20E/Geospatial%20Machine%20Learning%20Crime%20Hotspot%20prediction/crime_hotspot_prediction/Dockerfile) is included in the project.
-
-### 1. Build the Docker Image
-```bash
-docker build -t crime-hotspot-prediction .
+Or using the Vercel CLI:
+```powershell
+npx vercel dev
 ```
 
-### 2. Run the Container
-```bash
-docker run -d -p 8501:8501 --name crime-hotspot-app crime-hotspot-prediction
-```
-
-Open `http://localhost:8501` in your browser.
-
 ---
 
-## 📋 Pre-Deployment Checklist
+## 📁 Architecture Overview
 
-- [x] Python dependencies specified in `requirements.txt`
-- [x] Streamlit server configured in `.streamlit/config.toml` (Headless = true)
-- [x] Models and sample data included in `models/` and `data/`
-- [x] Fallback auto-generation script included (`data/generate_sample_data.py`)
-- [x] Tested with `python test_modules.py` (all tests passing)
-- [x] Cross-platform path handling using `os.path`
-
+- `vercel.json` — Vercel routing configuration directing `/api/*` to Python serverless and `/*` to static web frontend.
+- `api/index.py` — Flask Serverless Backend providing endpoints for DBSCAN clustering, ML hotspot prediction, and KPI metrics.
+- `public/index.html` — Interactive single-page web dashboard with TailwindCSS, Leaflet.js interactive maps, and Chart.js.
+- `src/` — Preprocessing, geospatial calculations, Random Forest machine learning, and cyclical time encodings.
+- `data/` — Synthetic crime dataset.
+- `models/` — Persisted models with automatic in-memory fallback.

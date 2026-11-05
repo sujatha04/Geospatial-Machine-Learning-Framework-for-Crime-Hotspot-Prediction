@@ -1,0 +1,1028 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Geospatial ML Crime Hotspot Prediction</title>
+  
+  <!-- Tailwind CSS CDN -->
+  <script src="https://cdn.tailwindcss.com"></script>
+  <!-- Font Awesome -->
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  <!-- Leaflet CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <!-- Leaflet MarkerCluster CSS -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
+  <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  <!-- Chart.js -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+
+  <style>
+    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+    .map-container { height: 600px; width: 100%; z-index: 1; border-radius: 0.75rem; }
+    .tab-active { border-bottom: 3px solid #2563eb; color: #1d4ed8; font-weight: 600; }
+    .tab-inactive { color: #64748b; }
+    .tab-inactive:hover { color: #1e293b; }
+    .pulse-online { animation: pulse-green 2s infinite; }
+    @keyframes pulse-green {
+      0%, 100% { opacity: 1; transform: scale(1); }
+      50% { opacity: 0.6; transform: scale(1.2); }
+    }
+  </style>
+</head>
+<body class="text-slate-800 flex flex-col min-h-screen">
+
+  <!-- ======================================================== -->
+  <!-- Top Navbar -->
+  <!-- ======================================================== -->
+  <header class="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shadow-lg sticky top-0 z-50">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
+      <div class="flex items-center space-x-3">
+        <span class="text-2xl">🗺️</span>
+        <div>
+          <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
+            Crime Hotspot Prediction
+            <span class="text-xs bg-blue-500/30 text-blue-300 border border-blue-400/40 px-2 py-0.5 rounded-full font-medium">Geospatial ML</span>
+          </h1>
+          <p class="text-xs text-slate-400">Random Forest & DBSCAN Analytics Framework</p>
+        </div>
+      </div>
+      <div class="flex items-center space-x-4">
+        <div class="hidden sm:flex items-center space-x-2 text-xs bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700">
+          <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-online"></span>
+          <span class="text-slate-300">Vercel API Connected</span>
+        </div>
+        <a href="/api/export-report" class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-md font-medium transition shadow flex items-center gap-1.5">
+          <i class="fa-solid fa-download"></i> Report
+        </a>
+      </div>
+    </div>
+
+    <!-- Navigation Tabs -->
+    <div class="bg-slate-900 border-t border-slate-800">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-8 overflow-x-auto text-sm">
+        <button onclick="switchTab('dashboard')" id="nav-dashboard" class="py-3 px-1 border-b-2 tab-active transition flex items-center gap-2 whitespace-nowrap">
+          <i class="fa-solid fa-house"></i> Dashboard
+        </button>
+        <button onclick="switchTab('analysis')" id="nav-analysis" class="py-3 px-1 border-b-2 tab-inactive transition flex items-center gap-2 whitespace-nowrap">
+          <i class="fa-solid fa-chart-simple"></i> Crime Analysis
+        </button>
+        <button onclick="switchTab('map')" id="nav-map" class="py-3 px-1 border-b-2 tab-inactive transition flex items-center gap-2 whitespace-nowrap">
+          <i class="fa-solid fa-map-location-dot"></i> Hotspot Map
+        </button>
+        <button onclick="switchTab('prediction')" id="nav-prediction" class="py-3 px-1 border-b-2 tab-inactive transition flex items-center gap-2 whitespace-nowrap">
+          <i class="fa-solid fa-wand-magic-sparkles"></i> ML Prediction
+        </button>
+        <button onclick="switchTab('performance')" id="nav-performance" class="py-3 px-1 border-b-2 tab-inactive transition flex items-center gap-2 whitespace-nowrap">
+          <i class="fa-solid fa-chart-line"></i> Model Performance
+        </button>
+      </div>
+    </div>
+  </header>
+
+  <!-- ======================================================== -->
+  <!-- Main Container -->
+  <!-- ======================================================== -->
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
+
+    <!-- TAB 1: DASHBOARD -->
+    <section id="tab-dashboard" class="space-y-6">
+      <!-- KPI Row -->
+      <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
+        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-blue-600">
+          <div class="text-xs uppercase text-slate-500 font-semibold tracking-wider">Total Records</div>
+          <div id="kpi-total" class="text-2xl font-bold text-blue-700 mt-1">...</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">Crime incidents</div>
+        </div>
+        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-indigo-600">
+          <div class="text-xs uppercase text-slate-500 font-semibold tracking-wider">Categories</div>
+          <div id="kpi-categories" class="text-2xl font-bold text-indigo-700 mt-1">...</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">Distinct types</div>
+        </div>
+        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-rose-600">
+          <div class="text-xs uppercase text-slate-500 font-semibold tracking-wider">🔴 High Risk</div>
+          <div id="kpi-high" class="text-2xl font-bold text-rose-700 mt-1">...</div>
+          <div id="kpi-high-pct" class="text-[11px] text-slate-400 mt-0.5">...</div>
+        </div>
+        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-amber-600">
+          <div class="text-xs uppercase text-slate-500 font-semibold tracking-wider">🟠 Medium Risk</div>
+          <div id="kpi-med" class="text-2xl font-bold text-amber-700 mt-1">...</div>
+          <div id="kpi-med-pct" class="text-[11px] text-slate-400 mt-0.5">...</div>
+        </div>
+        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-emerald-600">
+          <div class="text-xs uppercase text-slate-500 font-semibold tracking-wider">🟢 Low Risk</div>
+          <div id="kpi-low" class="text-2xl font-bold text-emerald-700 mt-1">...</div>
+          <div id="kpi-low-pct" class="text-[11px] text-slate-400 mt-0.5">...</div>
+        </div>
+        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-slate-600">
+          <div class="text-xs uppercase text-slate-500 font-semibold tracking-wider">Date Range</div>
+          <div id="kpi-dates" class="text-xs font-bold text-slate-700 mt-2">...</div>
+          <div class="text-[11px] text-slate-400 mt-1">Coverage period</div>
+        </div>
+      </div>
+
+      <!-- Charts Row 1 -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+            <i class="fa-solid fa-chart-column text-blue-600"></i> Crime Distribution by Category
+          </h3>
+          <div class="h-64"><canvas id="chart-category"></canvas></div>
+        </div>
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+            <i class="fa-solid fa-chart-line text-blue-600"></i> Monthly Crime Trend
+          </h3>
+          <div class="h-64"><canvas id="chart-trend"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Charts Row 2 -->
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+            <i class="fa-solid fa-chart-pie text-rose-600"></i> Risk Distribution
+          </h3>
+          <div class="h-56"><canvas id="chart-risk"></canvas></div>
+        </div>
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+            <i class="fa-solid fa-clock text-amber-600"></i> Crime by Hour of Day
+          </h3>
+          <div class="h-56"><canvas id="chart-hour"></canvas></div>
+        </div>
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+            <i class="fa-solid fa-calendar-week text-indigo-600"></i> Crime by Day of Week
+          </h3>
+          <div class="h-56"><canvas id="chart-dow"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Top Hotspots Table -->
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+          <i class="fa-solid fa-fire text-orange-600"></i> Top 10 Crime Hotspot Locations
+        </h3>
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-xs text-left">
+            <thead class="bg-slate-50 text-slate-500 uppercase border-b">
+              <tr>
+                <th class="py-2.5 px-3">#</th>
+                <th class="py-2.5 px-3">Location Name</th>
+                <th class="py-2.5 px-3">Total Crimes</th>
+                <th class="py-2.5 px-3">Most Frequent Crime</th>
+                <th class="py-2.5 px-3">Risk Assessment</th>
+              </tr>
+            </thead>
+            <tbody id="table-top-hotspots" class="divide-y divide-slate-100">
+              <tr><td colspan="5" class="py-4 text-center text-slate-400">Loading top hotspot areas...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 2: CRIME ANALYSIS -->
+    <section id="tab-analysis" class="space-y-6 hidden">
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+          <div>
+            <h2 class="text-base font-bold text-slate-800">📂 Crime Dataset Browser & Filtering</h2>
+            <p class="text-xs text-slate-500">Filter, inspect, and export clean crime incident data</p>
+          </div>
+          <div class="flex flex-wrap items-center gap-3">
+            <select id="analysis-crime-filter" onchange="loadAnalysisData()" class="text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="All">All Crime Types</option>
+            </select>
+            <select id="analysis-limit" onchange="loadAnalysisData()" class="text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+              <option value="50">50 Rows</option>
+              <option value="100" selected>100 Rows</option>
+              <option value="200">200 Rows</option>
+            </select>
+            <button onclick="downloadCSV()" class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-lg font-medium transition shadow flex items-center gap-1.5">
+              <i class="fa-solid fa-file-csv"></i> Download CSV
+            </button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto max-h-96">
+          <table class="min-w-full text-xs text-left">
+            <thead class="bg-slate-100 text-slate-600 uppercase border-b sticky top-0 z-10">
+              <tr>
+                <th class="py-2.5 px-3">Date</th>
+                <th class="py-2.5 px-3">Time</th>
+                <th class="py-2.5 px-3">Crime Type</th>
+                <th class="py-2.5 px-3">Location</th>
+                <th class="py-2.5 px-3">Latitude</th>
+                <th class="py-2.5 px-3">Longitude</th>
+                <th class="py-2.5 px-3">Risk Level</th>
+              </tr>
+            </thead>
+            <tbody id="table-analysis" class="divide-y divide-slate-100">
+              <tr><td colspan="7" class="py-4 text-center text-slate-400">Loading dataset records...</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- DBSCAN Clustering Section -->
+      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+          <div>
+            <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <i class="fa-solid fa-circle-nodes text-blue-600"></i> DBSCAN Geospatial Clustering
+            </h3>
+            <p class="text-xs text-slate-500">Density-based spatial clustering of crime locations (Haversine metric)</p>
+          </div>
+          <div class="flex items-center gap-3">
+            <label class="text-xs text-slate-600">Radius: <span id="eps-val">0.5</span> km</label>
+            <input type="range" id="input-eps" min="0.2" max="2.0" step="0.1" value="0.5" oninput="document.getElementById('eps-val').innerText = this.value" class="w-24">
+            <button onclick="loadClusters()" class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded-lg font-medium transition shadow">
+              Run Clustering
+            </button>
+          </div>
+        </div>
+
+        <div class="overflow-x-auto">
+          <table class="min-w-full text-xs text-left">
+            <thead class="bg-slate-50 text-slate-600 uppercase border-b">
+              <tr>
+                <th class="py-2 px-3">Cluster ID</th>
+                <th class="py-2 px-3">Crimes Count</th>
+                <th class="py-2 px-3">Centroid (Lat, Lon)</th>
+                <th class="py-2 px-3">Top Crime Type</th>
+                <th class="py-2 px-3">Assigned Risk</th>
+              </tr>
+            </thead>
+            <tbody id="table-clusters" class="divide-y divide-slate-100">
+              <tr><td colspan="5" class="py-4 text-center text-slate-400">Click 'Run Clustering' to compute density clusters.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 3: HOTSPOT MAP -->
+    <section id="tab-map" class="space-y-6 hidden">
+      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
+        <div class="flex items-center space-x-4">
+          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Map Layers:</span>
+          <label class="inline-flex items-center text-xs text-slate-700 cursor-pointer">
+            <input type="checkbox" id="layer-heatmap" checked onchange="toggleLayers()" class="rounded text-blue-600 mr-1.5">
+            🌡 Heatmap
+          </label>
+          <label class="inline-flex items-center text-xs text-slate-700 cursor-pointer">
+            <input type="checkbox" id="layer-markers" checked onchange="toggleLayers()" class="rounded text-blue-600 mr-1.5">
+            📍 Crime Markers
+          </label>
+          <label class="inline-flex items-center text-xs text-slate-700 cursor-pointer">
+            <input type="checkbox" id="layer-clusters" checked onchange="toggleLayers()" class="rounded text-blue-600 mr-1.5">
+            🔵 Density Clusters
+          </label>
+        </div>
+        <div class="flex items-center space-x-2">
+          <label class="text-xs text-slate-500">Filter:</label>
+          <select id="map-crime-filter" onchange="loadMapData()" class="text-xs bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5">
+            <option value="All">All Crimes</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- Map & Search Layout -->
+      <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
+        <!-- Map Panel -->
+        <div class="lg:col-span-3 bg-white p-2 rounded-xl shadow-sm border border-slate-200">
+          <div id="hotspot-map" class="map-container"></div>
+        </div>
+
+        <!-- Location Search & Assessment Panel -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between space-y-4">
+          <div>
+            <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2 mb-1">
+              <i class="fa-solid fa-location-crosshairs text-blue-600"></i> Location Risk Search
+            </h3>
+            <p class="text-xs text-slate-500 mb-3">Enter coordinates or click directly on map to assess local risk.</p>
+
+            <div class="space-y-3">
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 uppercase">Latitude</label>
+                <input type="number" id="search-lat" value="40.7128" step="0.0001" class="w-full text-xs p-2 border border-slate-300 rounded mt-0.5 focus:ring-1 focus:ring-blue-500">
+              </div>
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 uppercase">Longitude</label>
+                <input type="number" id="search-lon" value="-74.0060" step="0.0001" class="w-full text-xs p-2 border border-slate-300 rounded mt-0.5 focus:ring-1 focus:ring-blue-500">
+              </div>
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600 uppercase">Search Radius: <span id="radius-val">1.0</span> km</label>
+                <input type="range" id="search-radius" min="0.5" max="5.0" step="0.5" value="1.0" oninput="document.getElementById('radius-val').innerText = this.value" class="w-full mt-1">
+              </div>
+              <button onclick="searchLocation()" class="w-full text-xs bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 rounded-lg shadow transition">
+                🔍 Analyse Location
+              </button>
+            </div>
+          </div>
+
+          <!-- Result Box -->
+          <div id="search-result-box" class="hidden p-4 rounded-lg border-l-4">
+            <div class="text-[10px] uppercase font-bold tracking-wider" id="search-result-header">ASSESSMENT</div>
+            <div class="text-xl font-bold mt-1" id="search-result-risk">Low Risk</div>
+            <div class="text-xs mt-2 space-y-1 text-slate-600">
+              <div>📊 Confidence: <b id="search-result-conf">0%</b></div>
+              <div>🔢 Nearby Incidents: <b id="search-result-count">0</b></div>
+              <div>🏆 Dominant Crime: <b id="search-result-top">None</b></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 4: ML PREDICTION -->
+    <section id="tab-prediction" class="space-y-6 hidden">
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <!-- Single Point Form -->
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2 mb-1">
+            <i class="fa-solid fa-wand-magic-sparkles text-blue-600"></i> Single Location ML Predictor
+          </h3>
+          <p class="text-xs text-slate-500 mb-4">Run the Random Forest classifier for specific spatial & temporal inputs.</p>
+
+          <form onsubmit="predictSingleLocation(event)" class="space-y-3">
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600">Latitude</label>
+                <input type="number" id="pred-lat" value="40.7128" step="0.0001" required class="w-full text-xs p-2 border border-slate-300 rounded mt-0.5">
+              </div>
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600">Longitude</label>
+                <input type="number" id="pred-lon" value="-74.0060" step="0.0001" required class="w-full text-xs p-2 border border-slate-300 rounded mt-0.5">
+              </div>
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600">Month</label>
+                <select id="pred-month" class="w-full text-xs p-2 border border-slate-300 rounded mt-0.5">
+                  <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option>
+                  <option value="4">Apr</option><option value="5">May</option><option value="6" selected>Jun</option>
+                  <option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option>
+                  <option value="10">Oct</option><option value="11">Nov</option><option value="12">Dec</option>
+                </select>
+              </div>
+              <div>
+                <label class="text-[11px] font-semibold text-slate-600">Hour (0-23)</label>
+                <input type="number" id="pred-hour" min="0" max="23" value="14" class="w-full text-xs p-2 border border-slate-300 rounded mt-0.5">
+              </div>
+            </div>
+
+            <div>
+              <label class="text-[11px] font-semibold text-slate-600">Crime Context Type</label>
+              <select id="pred-crime" class="w-full text-xs p-2 border border-slate-300 rounded mt-0.5">
+                <option value="Theft">Theft</option>
+                <option value="Assault">Assault</option>
+                <option value="Burglary">Burglary</option>
+                <option value="Vandalism">Vandalism</option>
+                <option value="Robbery">Robbery</option>
+              </select>
+            </div>
+
+            <button type="submit" class="w-full text-xs bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-600 hover:to-indigo-600 text-white font-semibold py-2.5 rounded-lg shadow transition mt-2">
+              🔮 Predict Risk Level
+            </button>
+          </form>
+        </div>
+
+        <!-- Prediction Result Display -->
+        <div class="lg:col-span-2 space-y-4">
+          <div id="pred-result-container" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            <!-- ML Card -->
+            <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-slate-300" id="card-ml">
+              <div class="text-[10px] text-slate-400 uppercase font-bold">1. ML MODEL PREDICTION</div>
+              <div class="text-xl font-bold mt-1 text-slate-700" id="pred-ml-risk">—</div>
+              <div class="text-xs text-slate-600 mt-2 space-y-0.5" id="pred-ml-probs">
+                <div>Confidence: —</div>
+                <div>P(Low): —</div>
+                <div>P(Med): —</div>
+                <div>P(High): —</div>
+              </div>
+            </div>
+
+            <!-- Historical Card -->
+            <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-slate-300" id="card-geo">
+              <div class="text-[10px] text-slate-400 uppercase font-bold">2. HISTORICAL SPATIAL DENSITY</div>
+              <div class="text-xl font-bold mt-1 text-slate-700" id="pred-geo-risk">—</div>
+              <div class="text-xs text-slate-600 mt-2 space-y-0.5" id="pred-geo-info">
+                <div>Nearby Incidents: —</div>
+                <div>Dominant Crime: —</div>
+                <div>Radius: 1.0 km</div>
+              </div>
+            </div>
+
+            <!-- Combined Card -->
+            <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-slate-300" id="card-combined">
+              <div class="text-[10px] text-slate-400 uppercase font-bold">3. COMBINED RISK SCORE</div>
+              <div class="text-xl font-bold mt-1 text-slate-700" id="pred-comb-risk">—</div>
+              <div class="text-xs text-slate-600 mt-2" id="pred-comb-info">
+                Submit form on the left to calculate combined risk assessment.
+              </div>
+            </div>
+          </div>
+
+          <!-- Mini Map Preview -->
+          <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
+            <h4 class="text-xs font-semibold text-slate-600 mb-2">Location Visual Preview</h4>
+            <div id="pred-minimap" class="h-64 w-full rounded-lg"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB 5: MODEL PERFORMANCE -->
+    <section id="tab-performance" class="space-y-6 hidden">
+      <!-- Performance Metrics Row -->
+      <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
+        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-blue-600">
+          <div class="text-xs uppercase text-slate-500 font-semibold">Accuracy</div>
+          <div id="perf-acc" class="text-2xl font-bold text-blue-700 mt-1">...</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">Overall accuracy</div>
+        </div>
+        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-indigo-600">
+          <div class="text-xs uppercase text-slate-500 font-semibold">Precision</div>
+          <div id="perf-prec" class="text-2xl font-bold text-indigo-700 mt-1">...</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">Weighted avg</div>
+        </div>
+        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-cyan-600">
+          <div class="text-xs uppercase text-slate-500 font-semibold">Recall</div>
+          <div id="perf-rec" class="text-2xl font-bold text-cyan-700 mt-1">...</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">Weighted avg</div>
+        </div>
+        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-teal-600">
+          <div class="text-xs uppercase text-slate-500 font-semibold">F1 Score</div>
+          <div id="perf-f1" class="text-2xl font-bold text-teal-700 mt-1">...</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">Harmonic mean</div>
+        </div>
+        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-slate-600">
+          <div class="text-xs uppercase text-slate-500 font-semibold">5-Fold CV F1</div>
+          <div id="perf-cv" class="text-xl font-bold text-slate-800 mt-1">...</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">Stratified Cross-Val</div>
+        </div>
+      </div>
+
+      <!-- Charts: Confusion Matrix & Feature Importances -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+            <i class="fa-solid fa-table-cells text-blue-600"></i> Confusion Matrix Heatmap
+          </h3>
+          <div class="h-64"><canvas id="chart-cm"></canvas></div>
+        </div>
+        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+          <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
+            <i class="fa-solid fa-ranking-star text-emerald-600"></i> Top Feature Importances
+          </h3>
+          <div class="h-64"><canvas id="chart-features"></canvas></div>
+        </div>
+      </div>
+
+      <!-- Retrain Action Banner -->
+      <div class="bg-gradient-to-r from-blue-900 to-slate-900 text-white p-6 rounded-xl shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
+        <div>
+          <h3 class="text-base font-bold">Re-train Random Forest Model</h3>
+          <p class="text-xs text-blue-200 mt-1">Re-runs stratified 75/25 split and 5-fold cross-validation on current data.</p>
+        </div>
+        <div class="flex items-center gap-3">
+          <button onclick="retrainModel()" id="btn-retrain" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow transition flex items-center gap-2">
+            <i class="fa-solid fa-arrows-rotate"></i> Re-train Model
+          </button>
+          <a href="/api/export-report" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow transition">
+            Download Report (TXT)
+          </a>
+        </div>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- ======================================================== -->
+  <!-- Footer -->
+  <!-- ======================================================== -->
+  <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">
+    <div class="max-w-7xl mx-auto px-4">
+      <p class="font-semibold text-slate-700">Geospatial Machine Learning Crime Hotspot Prediction Framework</p>
+      <p class="mt-1 text-slate-400">⚠️ All data is SYNTHETIC (computer-generated) for academic demonstration. Not for operational law enforcement use.</p>
+      <p class="mt-2 text-slate-400">Deployed on Vercel Serverless Architecture • Built with Python & Leaflet</p>
+    </div>
+  </footer>
+
+  <!-- ======================================================== -->
+  <!-- Scripts: Leaflet, Heatmap, Cluster, Chart.js & Logic -->
+  <!-- ======================================================== -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="https://unpkg.com/leaflet.heat@0.2.0/dist/leaflet-heat.js"></script>
+  <script src="https://unpkg.com/leaflet.markercluster@1.5.3/dist/leaflet.markercluster.js"></script>
+
+  <script>
+    // Global App State
+    let hotspotMap = null;
+    let minimap = null;
+    let heatLayer = null;
+    let markerClusterGroup = null;
+    let clusterCirclesGroup = null;
+    let searchedMarker = null;
+    let searchedCircle = null;
+    let charts = {};
+
+    // Tab Switching
+    function switchTab(tabId) {
+      const tabs = ['dashboard', 'analysis', 'map', 'prediction', 'performance'];
+      tabs.forEach(t => {
+        document.getElementById(`tab-${t}`).classList.add('hidden');
+        document.getElementById(`nav-${t}`).classList.remove('tab-active');
+        document.getElementById(`nav-${t}`).classList.add('tab-inactive');
+      });
+      document.getElementById(`tab-${tabId}`).classList.remove('hidden');
+      document.getElementById(`nav-${tabId}`).classList.add('tab-active');
+      document.getElementById(`nav-${tabId}`).classList.remove('tab-inactive');
+
+      if (tabId === 'map' && hotspotMap) {
+        setTimeout(() => hotspotMap.invalidateSize(), 200);
+      }
+      if (tabId === 'prediction' && minimap) {
+        setTimeout(() => minimap.invalidateSize(), 200);
+      }
+    }
+
+    // Initialize Dashboard Data
+    async function initDashboard() {
+      try {
+        const statsRes = await fetch('/api/stats');
+        const stats = await statsRes.json();
+
+        document.getElementById('kpi-total').innerText = stats.total_records.toLocaleString();
+        document.getElementById('kpi-categories').innerText = stats.total_categories;
+        document.getElementById('kpi-high').innerText = stats.risk_high.toLocaleString();
+        document.getElementById('kpi-high-pct').innerText = `${stats.risk_high_pct}% of records`;
+        document.getElementById('kpi-med').innerText = stats.risk_medium.toLocaleString();
+        document.getElementById('kpi-med-pct').innerText = `${stats.risk_medium_pct}% of records`;
+        document.getElementById('kpi-low').innerText = stats.risk_low.toLocaleString();
+        document.getElementById('kpi-low-pct').innerText = `${stats.risk_low_pct}% of records`;
+        document.getElementById('kpi-dates').innerText = `${stats.date_range[0]} – ${stats.date_range[1]}`;
+
+        // Analytics charts
+        const aRes = await fetch('/api/analytics');
+        const aData = await aRes.json();
+
+        renderCategoryChart(aData.categories);
+        renderTrendChart(aData.trend);
+        renderRiskChart(stats);
+        renderHourChart(aData.hourly);
+        renderDowChart(aData.day_of_week);
+        renderTopHotspots(aData.top_locations);
+
+      } catch (err) {
+        console.error('Error loading dashboard:', err);
+      }
+    }
+
+    function renderCategoryChart(data) {
+      const ctx = document.getElementById('chart-category').getContext('2d');
+      if (charts.category) charts.category.destroy();
+      charts.category = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: data.map(d => d.type),
+          datasets: [{
+            label: 'Incidents',
+            data: data.map(d => d.count),
+            backgroundColor: '#3b82f6',
+            borderRadius: 6
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { grid: { display: false } }, y: { grid: { display: false } } }
+        }
+      });
+    }
+
+    function renderTrendChart(data) {
+      const ctx = document.getElementById('chart-trend').getContext('2d');
+      if (charts.trend) charts.trend.destroy();
+      charts.trend = new Chart(ctx, {
+        type: 'line',
+        data: {
+          labels: data.map(d => d.date),
+          datasets: [{
+            label: 'Incidents',
+            data: data.map(d => d.count),
+            borderColor: '#2563eb',
+            backgroundColor: 'rgba(37, 99, 235, 0.1)',
+            fill: true,
+            tension: 0.3,
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } },
+          scales: { x: { grid: { display: false } } }
+        }
+      });
+    }
+
+    function renderRiskChart(stats) {
+      const ctx = document.getElementById('chart-risk').getContext('2d');
+      if (charts.risk) charts.risk.destroy();
+      charts.risk = new Chart(ctx, {
+        type: 'doughnut',
+        data: {
+          labels: ['High Risk', 'Medium Risk', 'Low Risk'],
+          datasets: [{
+            data: [stats.risk_high, stats.risk_medium, stats.risk_low],
+            backgroundColor: ['#ef4444', '#f97316', '#10b981'],
+            borderWidth: 2
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { position: 'bottom' } }
+        }
+      });
+    }
+
+    function renderHourChart(data) {
+      const ctx = document.getElementById('chart-hour').getContext('2d');
+      if (charts.hour) charts.hour.destroy();
+      charts.hour = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: data.map(d => `${d.hour}:00`),
+          datasets: [{
+            data: data.map(d => d.count),
+            backgroundColor: '#ea580c',
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    function renderDowChart(data) {
+      const ctx = document.getElementById('chart-dow').getContext('2d');
+      if (charts.dow) charts.dow.destroy();
+      charts.dow = new Chart(ctx, {
+        type: 'bar',
+        data: {
+          labels: data.map(d => d.day),
+          datasets: [{
+            data: data.map(d => d.count),
+            backgroundColor: '#6366f1',
+            borderRadius: 4
+          }]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    function renderTopHotspots(locs) {
+      const tbody = document.getElementById('table-top-hotspots');
+      tbody.innerHTML = locs.map((l, i) => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="py-2.5 px-3 font-semibold text-slate-500">${i + 1}</td>
+          <td class="py-2.5 px-3 font-medium text-slate-800">${l.location}</td>
+          <td class="py-2.5 px-3 font-bold text-blue-700">${l.crime_count}</td>
+          <td class="py-2.5 px-3 text-slate-600">${l.top_crime}</td>
+          <td class="py-2.5 px-3">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${l.crime_count >= 150 ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}">
+              ${l.crime_count >= 150 ? 'HIGH RISK' : 'ELEVATED'}
+            </span>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    // Tab 2: Crime Analysis Data
+    async function loadAnalysisData() {
+      const type = document.getElementById('analysis-crime-filter').value;
+      const limit = document.getElementById('analysis-limit').value;
+      const res = await fetch(`/api/data?crime_type=${encodeURIComponent(type)}&limit=${limit}`);
+      const data = await res.json();
+
+      // Populate filter options if needed
+      const select = document.getElementById('analysis-crime-filter');
+      const mapSelect = document.getElementById('map-crime-filter');
+      if (select.children.length === 1 && data.crime_types) {
+        data.crime_types.forEach(t => {
+          select.innerHTML += `<option value="${t}">${t}</option>`;
+          mapSelect.innerHTML += `<option value="${t}">${t}</option>`;
+        });
+      }
+
+      const tbody = document.getElementById('table-analysis');
+      tbody.innerHTML = data.records.map(r => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="py-2 px-3 text-slate-700">${r.date}</td>
+          <td class="py-2 px-3 text-slate-600">${r.time || '12:00'}</td>
+          <td class="py-2 px-3 font-medium text-slate-900">${r.crime_type}</td>
+          <td class="py-2 px-3 text-slate-600">${r.location || 'Urban Grid'}</td>
+          <td class="py-2 px-3 font-mono text-[11px]">${r.latitude.toFixed(4)}</td>
+          <td class="py-2 px-3 font-mono text-[11px]">${r.longitude.toFixed(4)}</td>
+          <td class="py-2 px-3">
+            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${r.risk_label === 2 ? 'bg-red-100 text-red-700' : r.risk_label === 1 ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}">
+              ${r.risk_label === 2 ? 'High Risk' : r.risk_label === 1 ? 'Medium Risk' : 'Low Risk'}
+            </span>
+          </td>
+        </tr>
+      `).join('');
+    }
+
+    async function loadClusters() {
+      const eps = document.getElementById('input-eps').value;
+      const res = await fetch(`/api/clusters?eps=${eps}`);
+      const data = await res.json();
+
+      const tbody = document.getElementById('table-clusters');
+      if (data.clusters.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="5" class="py-3 text-center text-slate-400">No clusters found. Try increasing radius.</td></tr>';
+        return;
+      }
+
+      tbody.innerHTML = data.clusters.map(c => `
+        <tr class="hover:bg-slate-50 transition">
+          <td class="py-2 px-3 font-bold text-blue-600">#${c.cluster_id}</td>
+          <td class="py-2 px-3 font-bold">${c.crime_count} incidents</td>
+          <td class="py-2 px-3 font-mono">${c.lat_center.toFixed(4)}, ${c.lon_center.toFixed(4)}</td>
+          <td class="py-2 px-3 font-medium">${c.top_crime}</td>
+          <td class="py-2 px-3 font-bold ${c.risk_level === 'High' ? 'text-red-600' : 'text-orange-600'}">${c.risk_level}</td>
+        </tr>
+      `).join('');
+
+      // Also render on map
+      if (clusterCirclesGroup) {
+        clusterCirclesGroup.clearLayers();
+        data.clusters.forEach(c => {
+          const color = c.risk_level === 'High' ? '#dc2626' : '#ea580c';
+          L.circle([c.lat_center, c.lon_center], {
+            radius: Math.max(300, Math.min(c.crime_count * 25, 2000)),
+            color: color,
+            fillColor: color,
+            fillOpacity: 0.25,
+            weight: 2
+          }).bindPopup(`<b>Cluster #${c.cluster_id}</b><br>Incidents: ${c.crime_count}<br>Top Crime: ${c.top_crime}<br>Risk: ${c.risk_level}`)
+            .addTo(clusterCirclesGroup);
+        });
+      }
+    }
+
+    function downloadCSV() {
+      window.location.href = '/api/data?limit=5000';
+    }
+
+    // Tab 3: Interactive Hotspot Map
+    async function initHotspotMap() {
+      hotspotMap = L.map('hotspot-map').setView([40.7128, -74.0060], 12);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 18,
+        attribution: '© OpenStreetMap contributors'
+      }).addTo(hotspotMap);
+
+      heatLayer = L.heatLayer([], { radius: 18, blur: 14, maxZoom: 14 }).addTo(hotspotMap);
+      markerClusterGroup = L.markerClusterGroup().addTo(hotspotMap);
+      clusterCirclesGroup = L.layerGroup().addTo(hotspotMap);
+
+      hotspotMap.on('click', function(e) {
+        document.getElementById('search-lat').value = e.latlng.lat.toFixed(4);
+        document.getElementById('search-lon').value = e.latlng.lng.toFixed(4);
+        searchLocation();
+      });
+
+      await loadMapData();
+      await loadClusters();
+    }
+
+    async function loadMapData() {
+      const type = document.getElementById('map-crime-filter').value;
+      const res = await fetch(`/api/map-data?crime_type=${encodeURIComponent(type)}`);
+      const data = await res.json();
+
+      hotspotMap.setView(data.center, 12);
+
+      // Heat points
+      const heatPoints = data.points.map(p => [p.latitude, p.longitude, 0.7]);
+      heatLayer.setLatLngs(heatPoints);
+
+      // Marker Clusters
+      markerClusterGroup.clearLayers();
+      data.points.forEach(p => {
+        const marker = L.circleMarker([p.latitude, p.longitude], {
+          radius: 5,
+          color: p.risk_label === 2 ? '#ef4444' : p.risk_label === 1 ? '#f97316' : '#10b981',
+          fillOpacity: 0.7
+        }).bindPopup(`<b>🚨 ${p.crime_type}</b><br>📍 ${p.location}<br>📅 ${p.date}<br>⚠️ Risk: <b>${p.risk_text}</b>`);
+        markerClusterGroup.addLayer(marker);
+      });
+    }
+
+    function toggleLayers() {
+      const showHeat = document.getElementById('layer-heatmap').checked;
+      const showMarkers = document.getElementById('layer-markers').checked;
+      const showClusters = document.getElementById('layer-clusters').checked;
+
+      if (showHeat) hotspotMap.addLayer(heatLayer); else hotspotMap.removeLayer(heatLayer);
+      if (showMarkers) hotspotMap.addLayer(markerClusterGroup); else hotspotMap.removeLayer(markerClusterGroup);
+      if (showClusters) hotspotMap.addLayer(clusterCirclesGroup); else hotspotMap.removeLayer(clusterCirclesGroup);
+    }
+
+    async function searchLocation() {
+      const lat = parseFloat(document.getElementById('search-lat').value);
+      const lon = parseFloat(document.getElementById('search-lon').value);
+      const radius = parseFloat(document.getElementById('search-radius').value);
+
+      const res = await fetch('/api/search-location', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat, lon, radius })
+      });
+      const data = await res.json();
+
+      const box = document.getElementById('search-result-box');
+      box.classList.remove('hidden');
+
+      const isHigh = data.risk_level === 'High Risk';
+      const isMed = data.risk_level === 'Medium Risk';
+      box.className = `p-4 rounded-lg border-l-4 ${isHigh ? 'bg-red-50 border-red-500' : isMed ? 'bg-orange-50 border-orange-500' : 'bg-emerald-50 border-emerald-500'}`;
+
+      document.getElementById('search-result-risk').innerText = data.risk_level;
+      document.getElementById('search-result-risk').className = `text-xl font-bold mt-1 ${isHigh ? 'text-red-700' : isMed ? 'text-orange-700' : 'text-emerald-700'}`;
+      document.getElementById('search-result-conf').innerText = `${Math.round(data.confidence * 100)}%`;
+      document.getElementById('search-result-count').innerText = `${data.crime_count} incidents`;
+      document.getElementById('search-result-top').innerText = data.top_crime;
+
+      // Map marker
+      if (searchedMarker) hotspotMap.removeLayer(searchedMarker);
+      if (searchedCircle) hotspotMap.removeLayer(searchedCircle);
+
+      searchedMarker = L.marker([lat, lon]).addTo(hotspotMap).bindPopup(`<b>Analyzed Location</b><br>${data.risk_level}`).openPopup();
+      searchedCircle = L.circle([lat, lon], { radius: radius * 1000, color: isHigh ? '#dc2626' : '#2563eb', fillOpacity: 0.15 }).addTo(hotspotMap);
+      hotspotMap.setView([lat, lon], 13);
+    }
+
+    // Tab 4: ML Prediction
+    async function predictSingleLocation(e) {
+      e.preventDefault();
+      const lat = parseFloat(document.getElementById('pred-lat').value);
+      const lon = parseFloat(document.getElementById('pred-lon').value);
+      const month = parseInt(document.getElementById('pred-month').value);
+      const hour = parseInt(document.getElementById('pred-hour').value);
+      const crime = document.getElementById('pred-crime').value;
+
+      const res = await fetch('/api/predict-single', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ lat, lon, month, hour, crime_type: crime })
+      });
+      const data = await res.json();
+
+      // ML Card
+      const ml = data.ml;
+      document.getElementById('pred-ml-risk').innerText = ml.risk_level;
+      document.getElementById('pred-ml-risk').style.color = ml.color;
+      document.getElementById('card-ml').style.borderLeftColor = ml.color;
+      document.getElementById('pred-ml-probs').innerHTML = `
+        <div>Confidence: <b>${Math.round(ml.confidence * 100)}%</b></div>
+        <div>P(Low): ${(ml.probability_low * 100).toFixed(0)}%</div>
+        <div>P(Med): ${(ml.probability_medium * 100).toFixed(0)}%</div>
+        <div>P(High): ${(ml.probability_high * 100).toFixed(0)}%</div>
+      `;
+
+      // Geo Card
+      const geo = data.geospatial;
+      document.getElementById('pred-geo-risk').innerText = geo.risk_level;
+      document.getElementById('pred-geo-risk').style.color = geo.risk_level === 'High Risk' ? '#dc2626' : '#ea580c';
+      document.getElementById('card-geo').style.borderLeftColor = geo.risk_level === 'High Risk' ? '#dc2626' : '#ea580c';
+      document.getElementById('pred-geo-info').innerHTML = `
+        <div>Confidence: <b>${Math.round(geo.confidence * 100)}%</b></div>
+        <div>Nearby Incidents: <b>${geo.crime_count}</b></div>
+        <div>Dominant Crime: <b>${geo.top_crime}</b></div>
+      `;
+
+      // Combined Card
+      const comb = data.combined;
+      document.getElementById('pred-comb-risk').innerText = comb.risk_level;
+      document.getElementById('pred-comb-risk').style.color = comb.color;
+      document.getElementById('card-combined').style.borderLeftColor = comb.color;
+      document.getElementById('pred-comb-info').innerHTML = `
+        <div>Combined Risk Score: <b>${comb.score.toFixed(1)} / 2.0</b></div>
+        <div class="mt-1">Evaluated at coordinates (${lat.toFixed(4)}, ${lon.toFixed(4)})</div>
+      `;
+
+      // Minimap
+      if (!minimap) {
+        minimap = L.map('pred-minimap').setView([lat, lon], 13);
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(minimap);
+      } else {
+        minimap.setView([lat, lon], 13);
+      }
+      L.circleMarker([lat, lon], { radius: 8, color: comb.color, fillColor: comb.color, fillOpacity: 0.8 }).addTo(minimap);
+      L.circle([lat, lon], { radius: 1000, color: comb.color, fillOpacity: 0.15 }).addTo(minimap);
+    }
+
+    // Tab 5: Performance Data
+    async function loadPerformanceData() {
+      const res = await fetch('/api/model-performance');
+      const data = await res.json();
+
+      document.getElementById('perf-acc').innerText = `${(data.accuracy * 100).toFixed(1)}%`;
+      document.getElementById('perf-prec').innerText = `${(data.precision * 100).toFixed(1)}%`;
+      document.getElementById('perf-rec').innerText = `${(data.recall * 100).toFixed(1)}%`;
+      document.getElementById('perf-f1').innerText = `${(data.f1_score * 100).toFixed(1)}%`;
+      document.getElementById('perf-cv').innerText = `${(data.cv_mean * 100).toFixed(1)}% ±${data.cv_std.toFixed(3)}`;
+
+      // Confusion Matrix
+      const cmCtx = document.getElementById('chart-cm').getContext('2d');
+      if (charts.cm) charts.cm.destroy();
+      const cmLabels = ['Low Risk', 'Med Risk', 'High Risk'];
+      const cmData = data.confusion_matrix;
+      charts.cm = new Chart(cmCtx, {
+        type: 'bar',
+        data: {
+          labels: cmLabels,
+          datasets: [
+            { label: 'Pred Low', data: [cmData[0][0], cmData[1][0], cmData[2][0]], backgroundColor: '#93c5fd' },
+            { label: 'Pred Med', data: [cmData[0][1], cmData[1][1], cmData[2][1]], backgroundColor: '#3b82f6' },
+            { label: 'Pred High', data: [cmData[0][2], cmData[1][2], cmData[2][2]], backgroundColor: '#1d4ed8' }
+          ]
+        },
+        options: {
+          responsive: true,
+          maintainAspectRatio: false,
+          scales: { x: { stacked: true }, y: { stacked: true } }
+        }
+      });
+
+      // Feature Importances
+      const fiCtx = document.getElementById('chart-features').getContext('2d');
+      if (charts.fi) charts.fi.destroy();
+      const fiItems = Object.entries(data.feature_importances).slice(0, 8);
+      charts.fi = new Chart(fiCtx, {
+        type: 'bar',
+        data: {
+          labels: fiItems.map(x => x[0]),
+          datasets: [{
+            label: 'Importance',
+            data: fiItems.map(x => x[1]),
+            backgroundColor: '#10b981',
+            borderRadius: 4
+          }]
+        },
+        options: {
+          indexAxis: 'y',
+          responsive: true,
+          maintainAspectRatio: false,
+          plugins: { legend: { display: false } }
+        }
+      });
+    }
+
+    async function retrainModel() {
+      const btn = document.getElementById('btn-retrain');
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Training...';
+      btn.disabled = true;
+
+      try {
+        const res = await fetch('/api/train', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ test_size: 0.25 }) });
+        const result = await res.json();
+        alert(`Model trained successfully! Accuracy: ${(result.accuracy * 100).toFixed(1)}%`);
+        await loadPerformanceData();
+      } catch (err) {
+        alert('Training error: ' + err);
+      } finally {
+        btn.innerHTML = '<i class="fa-solid fa-arrows-rotate"></i> Re-train Model';
+        btn.disabled = false;
+      }
+    }
+
+    // Initialize on page load
+    window.addEventListener('DOMContentLoaded', async () => {
+      await initDashboard();
+      await loadAnalysisData();
+      await initHotspotMap();
+      await loadPerformanceData();
+    });
+  </script>
+</body>
+</html>

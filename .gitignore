@@ -11,6 +11,11 @@ env/
 .env/
 .venv/
 ENV/
+Scripts/
+share/
+etc/
+pyvenv.cfg
+.vercel/
 
 # Jupyter Notebook
 .ipynb_checkpoints
@@ -48,9 +53,6 @@ desktop.ini
 *.swp
 *.swo
 *~
-
-# Model files (optional — keep them if you want model versioning)
-# models/*.pkl
 
 # Logs
 *.log
