@@ -1,7 +1,7 @@
 """
 pages/5_Model_Performance.py
 -----------------------------
-Model evaluation metrics, confusion matrix, feature importance, and report download.
+Model evaluation metrics, confusion matrix, feature importance, and audit report export.
 """
 
 import sys, os
@@ -16,7 +16,7 @@ import plotly.graph_objects as go
 from utils.helpers import (
     init_session_state, page_header, metric_card, no_data_warning,
     get_data_path, load_sample_data_cached, ensure_src_on_path,
-    df_to_csv_bytes, generate_report_text,
+    df_to_csv_bytes, generate_report_text, apply_custom_css,
 )
 
 ensure_src_on_path()
@@ -26,10 +26,15 @@ from src.visualization import (
     plot_risk_distribution, plot_crime_by_category,
 )
 
-st.set_page_config(page_title="Model Performance", page_icon="📈", layout="wide")
+st.set_page_config(page_title="Model Performance & Diagnostics | GeoCrime AI", page_icon="📈", layout="wide")
 init_session_state()
+apply_custom_css()
 
-page_header("Model Performance")
+page_header(
+    title="Model Diagnostics & Performance Evaluation",
+    subtitle="Evaluate multi-class Random Forest metrics, confusion matrices, Gini impurity feature rankings, and generate security audit reports.",
+    badge="Diagnostic Studio"
+)
 
 # Auto-load data
 df = st.session_state.get("df_processed")
@@ -59,15 +64,15 @@ if results is None:
 
 if not st.session_state.get("model_trained") or results is None:
     st.warning(
-        "⚠️ Model has not been trained yet. Please click the button below "
-        "or go to the **Prediction** page to train the model.",
+        "⚠️ Model weights have not been trained yet in this session. "
+        "Initialize model training below to compute diagnostic metrics.",
         icon="🤖",
     )
 
     # Quick train button
     if st.button("🚀 Train Model Now", type="primary"):
         from src.model_training import train_model
-        with st.spinner("Training model…"):
+        with st.spinner("Training Random Forest ensemble…"):
             results = train_model(df, test_size=0.25)
             st.session_state["model"] = results["model"]
             st.session_state["scaler"] = results["scaler"]
@@ -80,23 +85,23 @@ if not st.session_state.get("model_trained") or results is None:
 # ---------------------------------------------------------------------------
 # Overview Metrics
 # ---------------------------------------------------------------------------
-st.markdown("#### 📊 Model Performance Overview")
+st.markdown("#### 📊 Core Diagnostic Metrics (Holdout Test Set)")
 
 c1, c2, c3, c4, c5 = st.columns(5)
 with c1:
-    metric_card("Accuracy",  f"{results['accuracy']:.1%}",  "Overall correct predictions", "#1565c0")
+    metric_card("Accuracy",  f"{results['accuracy']:.1%}",  "Overall correct classifications", "#2563eb", icon="🎯")
 with c2:
-    metric_card("Precision", f"{results['precision']:.1%}", "Weighted avg precision", "#1976d2")
+    metric_card("Precision", f"{results['precision']:.1%}", "Macro weighted precision", "#0284c7", icon="📐")
 with c3:
-    metric_card("Recall",    f"{results['recall']:.1%}",    "Weighted avg recall", "#0288d1")
+    metric_card("Recall",    f"{results['recall']:.1%}",    "Macro weighted recall", "#059669", icon="🔍")
 with c4:
-    metric_card("F1 Score",  f"{results['f1_score']:.1%}",  "Weighted avg F1", "#00838f")
+    metric_card("F1 Score",  f"{results['f1_score']:.1%}",  "Balanced harmonic mean", "#7c3aed", icon="⚖️")
 with c5:
-    metric_card("CV F1",
+    metric_card("CV F1 Score",
                 f"{results['cv_mean']:.1%}",
-                f"5-fold, ±{results['cv_std']:.3f}", "#37474f")
+                f"5-fold CV (±{results['cv_std']:.3f})", "#475569", icon="🔁")
 
-st.markdown("---")
+st.write("")
 
 # ---------------------------------------------------------------------------
 # Confusion Matrix + Feature Importance
@@ -104,7 +109,7 @@ st.markdown("---")
 col_left, col_right = st.columns(2)
 
 with col_left:
-    st.markdown("##### 🔢 Confusion Matrix")
+    st.markdown("##### 🔢 Multi-Class Confusion Matrix")
     cm = results.get("confusion_matrix")
     if cm is not None:
         fig_cm = plot_confusion_matrix(cm)
@@ -113,7 +118,7 @@ with col_left:
         st.info("Confusion matrix not available.")
 
 with col_right:
-    st.markdown("##### 🌳 Feature Importances")
+    st.markdown("##### 🌳 Gini Feature Importance Ranking")
     importances = results.get("feature_importances", {})
     if importances:
         fig_fi = plot_feature_importance(importances)
@@ -121,15 +126,15 @@ with col_right:
     else:
         st.info("Feature importances not available.")
 
+st.write("")
+
 # ---------------------------------------------------------------------------
 # Classification Report Table
 # ---------------------------------------------------------------------------
-st.markdown("---")
-st.markdown("#### 📋 Classification Report")
+st.markdown("#### 📋 Stratified Classification Report")
 
 report = results.get("classification_report", {})
 if report:
-    # Remove averages for clarity in display
     main_classes = {k: v for k, v in report.items()
                     if k not in ("accuracy", "macro avg", "weighted avg")}
     avgs = {k: v for k, v in report.items()
@@ -137,19 +142,20 @@ if report:
 
     col_rep1, col_rep2 = st.columns(2)
     with col_rep1:
-        st.markdown("**Per-class Metrics**")
+        st.markdown("**Per-Class Breakdown**")
         df_report = pd.DataFrame(main_classes).T.round(3)
         st.dataframe(df_report, use_container_width=True)
     with col_rep2:
-        st.markdown("**Aggregate Metrics**")
+        st.markdown("**Macro & Weighted Aggregates**")
         df_avgs = pd.DataFrame(avgs).T.round(3)
         st.dataframe(df_avgs, use_container_width=True)
+
+st.write("")
 
 # ---------------------------------------------------------------------------
 # Cross-Validation Details
 # ---------------------------------------------------------------------------
-st.markdown("---")
-st.markdown("#### 🔄 Cross-Validation Results")
+st.markdown("#### 🔄 5-Fold Stratified Cross-Validation")
 
 cv_scores = results.get("cv_scores", [])
 if len(cv_scores) > 0:
@@ -159,110 +165,44 @@ if len(cv_scores) > 0:
     })
     fig_cv = px.bar(
         fold_df, x="Fold", y="F1 Score",
-        color="F1 Score", color_continuous_scale="Greens",
-        title="5-Fold Cross-Validation F1 Scores",
-        text="F1 Score", height=340,
+        color="F1 Score", color_continuous_scale="Blues",
+        title="Cross-Validation F1 Scores Across Folds",
+        text="F1 Score", height=320,
+        template="plotly_white",
     )
     fig_cv.update_traces(texttemplate="%{text:.3f}", textposition="outside")
-    fig_cv.update_layout(showlegend=False, plot_bgcolor="white",
-                         margin=dict(l=10, r=10, t=40, b=10),
-                         yaxis=dict(range=[0, 1.05]))
-    # Add mean line
+    fig_cv.update_layout(
+        showlegend=False,
+        plot_bgcolor="rgba(248,250,252,0.6)",
+        paper_bgcolor="white",
+        margin=dict(l=10, r=10, t=40, b=10),
+        yaxis=dict(range=[0, 1.1], gridcolor="#e2e8f0"),
+        xaxis=dict(gridcolor="#e2e8f0")
+    )
     fig_cv.add_hline(
-        y=results["cv_mean"], line_dash="dash", line_color="red",
-        annotation_text=f"Mean = {results['cv_mean']:.3f}",
+        y=results["cv_mean"], line_dash="dash", line_color="#ef4444",
+        annotation_text=f"Mean F1 = {results['cv_mean']:.3f}",
         annotation_position="top right",
     )
     st.plotly_chart(fig_cv, use_container_width=True)
 
-st.info(
-    f"📊 Mean CV F1: **{results['cv_mean']:.4f}** | "
-    f"Std: **{results['cv_std']:.4f}** | "
-    f"Range: [{min(cv_scores):.3f} – {max(cv_scores):.3f}]"
-    if len(cv_scores) > 0 else "CV scores unavailable"
-)
+st.write("")
 
 # ---------------------------------------------------------------------------
-# Training Summary
+# Export Full Audit Report
 # ---------------------------------------------------------------------------
-st.markdown("---")
-st.markdown("#### ℹ️ Training Configuration")
-
-train_col1, train_col2 = st.columns(2)
-with train_col1:
-    st.markdown(f"""
-    | Parameter | Value |
-    |-----------|-------|
-    | Algorithm | Random Forest |
-    | N Estimators | 200 |
-    | Max Depth | 12 |
-    | Class Weight | Balanced |
-    | Training Samples | {results.get('train_size', 'N/A'):,} |
-    | Testing Samples | {results.get('test_size', 'N/A'):,} |
-    """)
-with train_col2:
-    class_dist = results.get("class_distribution", {})
-    lmap = {0: "Low Risk", 1: "Medium Risk", 2: "High Risk"}
-    dist_data = [{"Risk Level": lmap.get(k, k), "Count": v}
-                 for k, v in sorted(class_dist.items())]
-    if dist_data:
-        fig_dist = px.pie(
-            pd.DataFrame(dist_data), names="Risk Level", values="Count",
-            hole=0.4, height=280,
-            color="Risk Level",
-            color_discrete_map={"High Risk": "#d32f2f",
-                                "Medium Risk": "#f57c00",
-                                "Low Risk": "#388e3c"},
-            title="Training Label Distribution",
-        )
-        fig_dist.update_layout(margin=dict(l=0, r=0, t=30, b=0))
-        st.plotly_chart(fig_dist, use_container_width=True)
-
-# ---------------------------------------------------------------------------
-# Downloads
-# ---------------------------------------------------------------------------
-st.markdown("---")
-st.markdown("#### ⬇️ Download Reports")
-
-dl_col1, dl_col2, dl_col3 = st.columns(3)
-
-# Full text report
-with dl_col1:
+st.markdown("### 📄 Audit Report & Artifact Export")
+rep_col1, rep_col2 = st.columns([3, 1])
+with rep_col1:
+    st.markdown("Generate and export a comprehensive plain-text diagnostic summary report with all evaluation metrics, category breakdowns, and system configurations.")
+with rep_col2:
     report_text = generate_report_text(df, results)
     st.download_button(
-        "📄 Download Analysis Report (TXT)",
+        label="⬇️ Export Audit Report (.txt)",
         data=report_text,
-        file_name="crime_hotspot_report.txt",
+        file_name="geocrime_model_audit_report.txt",
         mime="text/plain",
     )
 
-# Dataset with predictions
-with dl_col2:
-    if st.session_state.get("model_trained"):
-        from src.model_training import predict_dataframe
-        model  = st.session_state["model"]
-        scaler = st.session_state["scaler"]
-        df_pred = predict_dataframe(df, model, scaler)
-        st.download_button(
-            "📊 Download Dataset with Predictions (CSV)",
-            data=df_to_csv_bytes(df_pred),
-            file_name="crime_data_with_predictions.csv",
-            mime="text/csv",
-        )
-    else:
-        st.button("📊 Train model first", disabled=True)
-
-# Grid predictions
-with dl_col3:
-    grid_df = st.session_state.get("grid_predictions")
-    if grid_df is not None:
-        st.download_button(
-            "🗺 Download Grid Predictions (CSV)",
-            data=df_to_csv_bytes(grid_df),
-            file_name="grid_predictions.csv",
-            mime="text/csv",
-        )
-    else:
-        st.button("🗺 Generate grid predictions first", disabled=True)
-
-st.caption("⚠️ All metrics are from a model trained on SYNTHETIC data — for academic use only.")
+st.write("")
+st.caption("⚠️ Metrics and models are benchmarked over synthetic demonstration data for academic research.")

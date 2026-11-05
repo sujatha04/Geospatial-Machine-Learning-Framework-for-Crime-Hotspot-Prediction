@@ -173,21 +173,151 @@ def generate_report_text(df: pd.DataFrame, train_results: dict = None) -> str:
 # UI helpers
 # ---------------------------------------------------------------------------
 
-def metric_card(title: str, value, subtitle: str = "", color: str = "#1565c0"):
+def apply_custom_css():
+    """Inject modern polished styling across all Streamlit pages."""
+    st.markdown(
+        """
+        <style>
+        @import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&family=Inter:wght@400;500;600;700&display=swap');
+
+        /* Global Typography */
+        html, body, [class*="css"], [class*="st-"] {
+            font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, sans-serif !important;
+        }
+
+        /* Modern background */
+        .stApp {
+            background-color: #f8fafc;
+            background-image: 
+                radial-gradient(at 0% 0%, rgba(37, 99, 235, 0.03) 0px, transparent 50%),
+                radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.03) 0px, transparent 50%);
+        }
+
+        /* Sidebar */
+        [data-testid="stSidebar"] {
+            background: linear-gradient(185deg, #090d16 0%, #0f172a 45%, #1e293b 100%) !important;
+            border-right: 1px solid rgba(255, 255, 255, 0.06);
+        }
+        [data-testid="stSidebar"] * {
+            color: #e2e8f0 !important;
+        }
+        [data-testid="stSidebarNav"] a {
+            border-radius: 8px;
+            margin: 3px 8px;
+            transition: all 0.2s ease;
+            padding: 8px 14px !important;
+        }
+        [data-testid="stSidebarNav"] a:hover {
+            background: rgba(255, 255, 255, 0.08) !important;
+            transform: translateX(3px);
+        }
+        [data-testid="stSidebarNav"] a[aria-current="page"] {
+            background: linear-gradient(90deg, rgba(37, 99, 235, 0.4), rgba(6, 182, 212, 0.2)) !important;
+            border-left: 3px solid #38bdf8 !important;
+            font-weight: 600 !important;
+        }
+
+        /* Primary Button */
+        .stButton > button {
+            background: linear-gradient(135deg, #2563eb 0%, #1d4ed8 100%) !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 8px !important;
+            font-weight: 600 !important;
+            font-size: 0.875rem !important;
+            padding: 0.55rem 1.25rem !important;
+            box-shadow: 0 4px 14px rgba(37, 99, 235, 0.25) !important;
+            transition: all 0.2s ease !important;
+        }
+        .stButton > button:hover {
+            background: linear-gradient(135deg, #1d4ed8 0%, #1e40af 100%) !important;
+            box-shadow: 0 6px 20px rgba(37, 99, 235, 0.4) !important;
+            transform: translateY(-1px) !important;
+        }
+
+        /* Download Button */
+        .stDownloadButton > button {
+            background: linear-gradient(135deg, #059669 0%, #047857 100%) !important;
+            color: white !important;
+            border: none !important;
+            border-radius: 8px !important;
+            font-weight: 600 !important;
+            box-shadow: 0 4px 14px rgba(5, 150, 105, 0.25) !important;
+            transition: all 0.2s ease !important;
+        }
+        .stDownloadButton > button:hover {
+            background: linear-gradient(135deg, #047857 0%, #065f46 100%) !important;
+            box-shadow: 0 6px 18px rgba(5, 150, 105, 0.4) !important;
+            transform: translateY(-1px) !important;
+        }
+
+        /* Form Controls */
+        div[data-baseweb="select"] > div,
+        div[data-baseweb="input"] > div {
+            border-radius: 8px !important;
+            border: 1.5px solid #cbd5e1 !important;
+            background-color: white !important;
+        }
+        div[data-baseweb="select"] > div:focus-within,
+        div[data-baseweb="input"] > div:focus-within {
+            border-color: #2563eb !important;
+            box-shadow: 0 0 0 3px rgba(37, 99, 235, 0.12) !important;
+        }
+
+        /* Tabs */
+        .stTabs [data-baseweb="tab-list"] {
+            gap: 8px !important;
+            border-bottom: 2px solid #e2e8f0 !important;
+        }
+        .stTabs [data-baseweb="tab"] {
+            border-radius: 6px !important;
+            padding: 8px 16px !important;
+            font-weight: 600 !important;
+            font-size: 0.85rem !important;
+            color: #64748b !important;
+        }
+        .stTabs [aria-selected="true"] {
+            color: #2563eb !important;
+            background: #eff6ff !important;
+        }
+
+        /* Dataframes */
+        div[data-testid="stDataFrame"] {
+            border-radius: 12px !important;
+            overflow: hidden !important;
+            border: 1px solid #e2e8f0 !important;
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04) !important;
+        }
+        </style>
+        """,
+        unsafe_allow_html=True,
+    )
+
+
+def metric_card(title: str, value, subtitle: str = "", color: str = "#2563eb", icon: str = ""):
     """Render a styled metric card using st.markdown."""
     st.markdown(
         f"""
         <div style="
-            background: linear-gradient(135deg, {color}22, {color}11);
-            border-left: 4px solid {color};
-            border-radius: 8px;
-            padding: 14px 18px;
+            background: white;
+            border-radius: 12px;
+            padding: 16px 18px;
             margin: 4px 0;
+            border: 1px solid #e2e8f0;
+            border-left: 4px solid {color};
+            box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.04), 0 2px 4px -2px rgba(0, 0, 0, 0.04);
+            transition: all 0.2s ease;
         ">
-            <div style="font-size:12px;color:#555;font-weight:600;text-transform:uppercase;
-                        letter-spacing:0.5px">{title}</div>
-            <div style="font-size:26px;font-weight:700;color:{color};line-height:1.2">{value}</div>
-            <div style="font-size:11px;color:#777;margin-top:2px">{subtitle}</div>
+            <div style="display: flex; align-items: center; justify-content: space-between; margin-bottom: 6px;">
+                <span style="font-size: 11px; font-weight: 700; color: #64748b; text-transform: uppercase; letter-spacing: 0.6px;">
+                    {title}
+                </span>
+                {"<span style='font-size: 15px;'>" + icon + "</span>" if icon else ""}
+            </div>
+            <div style="font-size: 26px; font-weight: 800; color: {color}; line-height: 1.1; letter-spacing: -0.02em;">
+                {value}
+            </div>
+            {"<div style='font-size: 11px; color: #94a3b8; font-weight: 500; margin-top: 5px;'>" + subtitle + "</div>" if subtitle else ""}
         </div>
         """,
         unsafe_allow_html=True,
@@ -196,25 +326,42 @@ def metric_card(title: str, value, subtitle: str = "", color: str = "#1565c0"):
 
 def risk_badge(risk_level: str) -> str:
     colors = {
-        "High Risk": "#d32f2f", "High": "#d32f2f",
-        "Medium Risk": "#e65100", "Medium": "#e65100",
-        "Low Risk": "#2e7d32", "Low": "#2e7d32"
+        "High Risk": "#dc2626", "High": "#dc2626",
+        "Medium Risk": "#ea580c", "Medium": "#ea580c",
+        "Low Risk": "#16a34a", "Low": "#16a34a"
     }
-    c = colors.get(risk_level, "#555")
+    c = colors.get(risk_level, "#64748b")
     label = risk_level if "Risk" in str(risk_level) else f"{risk_level} Risk"
     return (
         f'<span style="background:{c};color:white;padding:3px 10px;'
-        f'border-radius:12px;font-size:12px;font-weight:600">{label}</span>'
+        f'border-radius:9999px;font-size:11px;font-weight:700;letter-spacing:0.3px;">{label}</span>'
     )
 
 
-def page_header(title: str, subtitle: str = ""):
+def page_header(title: str, subtitle: str = "", badge: str = "Geospatial ML"):
+    apply_custom_css()
     st.markdown(
         f"""
-        <div style="background:linear-gradient(90deg,#1565c0,#0d47a1);
-                    padding:20px 24px;border-radius:10px;margin-bottom:20px">
-            <h2 style="color:white;margin:0;font-size:22px">{title}</h2>
-            {"<p style='color:#bbdefb;margin:4px 0 0;font-size:13px'>"+subtitle+"</p>" if subtitle else ""}
+        <div style="
+            background: linear-gradient(135deg, #0f172a 0%, #1e3a8a 50%, #2563eb 100%);
+            padding: 24px 28px;
+            border-radius: 14px;
+            margin-bottom: 24px;
+            box-shadow: 0 10px 25px -5px rgba(30, 58, 138, 0.25), 0 8px 10px -6px rgba(30, 58, 138, 0.2);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            position: relative;
+            overflow: hidden;
+        ">
+            <div style="display: flex; align-items: center; gap: 8px; margin-bottom: 6px;">
+                <span style="background: rgba(255, 255, 255, 0.15); color: #93c5fd; font-size: 11px; font-weight: 700; padding: 2px 10px; border-radius: 9999px; text-transform: uppercase; letter-spacing: 0.5px; border: 1px solid rgba(255, 255, 255, 0.2);">
+                    {badge}
+                </span>
+                <span style="color: #60a5fa; font-size: 12px; font-weight: 600;">• Crime Hotspot Framework</span>
+            </div>
+            <h1 style="color: white; margin: 0; font-size: 24px; font-weight: 800; letter-spacing: -0.02em;">
+                {title}
+            </h1>
+            {"<p style='color: #bfdbfe; margin: 6px 0 0; font-size: 13px; font-weight: 400; max-width: 800px;'>" + subtitle + "</p>" if subtitle else ""}
         </div>
         """,
         unsafe_allow_html=True,

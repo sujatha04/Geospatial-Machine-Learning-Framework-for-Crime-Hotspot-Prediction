@@ -3,367 +3,586 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Geospatial ML Crime Hotspot Prediction</title>
+  <title>GeoCrime AI | Geospatial ML Crime Hotspot Prediction</title>
   
+  <!-- Google Fonts: Plus Jakarta Sans & JetBrains Mono -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Plus+Jakarta+Sans:wght@300;400;500;600;700;800&display=swap" rel="stylesheet">
+
   <!-- Tailwind CSS CDN -->
   <script src="https://cdn.tailwindcss.com"></script>
-  <!-- Font Awesome -->
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          fontFamily: {
+            sans: ['"Plus Jakarta Sans"', 'sans-serif'],
+            mono: ['"JetBrains Mono"', 'monospace'],
+          },
+          colors: {
+            brand: {
+              50: '#eff6ff',
+              100: '#dbeafe',
+              500: '#3b82f6',
+              600: '#2563eb',
+              700: '#1d4ed8',
+              900: '#1e3a8a',
+              950: '#090d16',
+            }
+          }
+        }
+      }
+    }
+  </script>
+
+  <!-- Font Awesome Icons -->
   <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+  
   <!-- Leaflet CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-  <!-- Leaflet MarkerCluster CSS -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.css" />
   <link rel="stylesheet" href="https://unpkg.com/leaflet.markercluster@1.5.3/dist/MarkerCluster.Default.css" />
+  
   <!-- Chart.js -->
   <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 
   <style>
-    @import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800&display=swap');
-    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
-    .map-container { height: 600px; width: 100%; z-index: 1; border-radius: 0.75rem; }
-    .tab-active { border-bottom: 3px solid #2563eb; color: #1d4ed8; font-weight: 600; }
-    .tab-inactive { color: #64748b; }
-    .tab-inactive:hover { color: #1e293b; }
-    .pulse-online { animation: pulse-green 2s infinite; }
-    @keyframes pulse-green {
+    body {
+      font-family: 'Plus Jakarta Sans', sans-serif;
+      background-color: #f8fafc;
+      background-image: 
+        radial-gradient(at 0% 0%, rgba(37, 99, 235, 0.04) 0px, transparent 50%),
+        radial-gradient(at 100% 100%, rgba(6, 182, 212, 0.04) 0px, transparent 50%);
+      color: #0f172a;
+    }
+
+    .map-container {
+      height: 600px;
+      width: 100%;
+      border-radius: 1rem;
+      z-index: 1;
+    }
+
+    .tab-active {
+      color: #2563eb;
+      border-bottom: 2px solid #2563eb;
+      background: linear-gradient(180deg, rgba(37, 99, 235, 0.04) 0%, rgba(37, 99, 235, 0.08) 100%);
+      font-weight: 700;
+    }
+
+    .tab-inactive {
+      color: #64748b;
+      border-bottom: 2px solid transparent;
+    }
+    .tab-inactive:hover {
+      color: #0f172a;
+      background-color: rgba(241, 245, 249, 0.6);
+    }
+
+    .pulse-beacon {
+      animation: pulse-ring 2.5s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+    }
+    @keyframes pulse-ring {
       0%, 100% { opacity: 1; transform: scale(1); }
-      50% { opacity: 0.6; transform: scale(1.2); }
+      50% { opacity: 0.5; transform: scale(1.15); }
+    }
+
+    /* Modern Custom Scrollbar */
+    ::-webkit-scrollbar {
+      width: 6px;
+      height: 6px;
+    }
+    ::-webkit-scrollbar-track {
+      background: #f1f5f9;
+    }
+    ::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    ::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    .glass-card {
+      background: rgba(255, 255, 255, 0.95);
+      backdrop-filter: blur(12px);
+      border: 1px solid rgba(226, 232, 240, 0.8);
+      box-shadow: 0 4px 20px -2px rgba(15, 23, 42, 0.05);
+    }
+
+    .kpi-card {
+      transition: all 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+    }
+    .kpi-card:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 12px 24px -4px rgba(15, 23, 42, 0.08);
     }
   </style>
 </head>
-<body class="text-slate-800 flex flex-col min-h-screen">
+<body class="min-h-screen flex flex-col antialiased">
 
   <!-- ======================================================== -->
-  <!-- Top Navbar -->
+  <!-- Top Executive Navbar -->
   <!-- ======================================================== -->
-  <header class="bg-gradient-to-r from-slate-900 via-blue-950 to-slate-900 text-white shadow-lg sticky top-0 z-50">
-    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex items-center justify-between h-16">
-      <div class="flex items-center space-x-3">
-        <span class="text-2xl">🗺️</span>
-        <div>
-          <h1 class="text-lg font-bold tracking-tight text-white flex items-center gap-2">
-            Crime Hotspot Prediction
-            <span class="text-xs bg-blue-500/30 text-blue-300 border border-blue-400/40 px-2 py-0.5 rounded-full font-medium">Geospatial ML</span>
-          </h1>
-          <p class="text-xs text-slate-400">Random Forest & DBSCAN Analytics Framework</p>
+  <header class="bg-gradient-to-r from-slate-950 via-[#0a1128] to-slate-900 text-white border-b border-slate-800/80 sticky top-0 z-50 shadow-xl backdrop-blur-md">
+    <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div class="flex items-center justify-between h-16">
+        
+        <!-- Brand Logo & Title -->
+        <div class="flex items-center space-x-3.5">
+          <div class="w-10 h-10 rounded-xl bg-gradient-to-tr from-blue-600 to-cyan-400 flex items-center justify-center text-xl shadow-lg shadow-blue-500/20">
+            🗺️
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h1 class="text-base sm:text-lg font-extrabold tracking-tight text-white flex items-center gap-1.5">
+                GeoCrime <span class="text-transparent bg-clip-text bg-gradient-to-r from-blue-400 to-cyan-300">AI</span>
+              </h1>
+              <span class="text-[10px] bg-blue-500/20 text-cyan-300 border border-cyan-400/30 px-2 py-0.5 rounded-full font-semibold uppercase tracking-wider">
+                ML 2.0
+              </span>
+            </div>
+            <p class="text-[11px] text-slate-400 font-medium">Enterprise Geospatial Crime Prediction & Spatial Analytics</p>
+          </div>
         </div>
-      </div>
-      <div class="flex items-center space-x-4">
-        <div class="hidden sm:flex items-center space-x-2 text-xs bg-slate-800/80 px-3 py-1.5 rounded-full border border-slate-700">
-          <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-online"></span>
-          <span class="text-slate-300">Vercel API Connected</span>
+
+        <!-- Telemetry & Actions -->
+        <div class="flex items-center space-x-3">
+          <div class="hidden sm:flex items-center space-x-2 text-xs bg-slate-900/90 px-3.5 py-1.5 rounded-full border border-slate-800">
+            <span class="w-2 h-2 rounded-full bg-emerald-400 pulse-beacon"></span>
+            <span class="text-slate-300 font-medium">Vercel Serverless Ready</span>
+          </div>
+          <a href="/api/export-report" class="text-xs bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white px-3.5 py-1.5 rounded-lg font-semibold transition-all duration-200 shadow-md shadow-blue-600/30 flex items-center gap-1.5">
+            <i class="fa-solid fa-file-arrow-down"></i>
+            <span>Audit Report</span>
+          </a>
         </div>
-        <a href="/api/export-report" class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-1.5 rounded-md font-medium transition shadow flex items-center gap-1.5">
-          <i class="fa-solid fa-download"></i> Report
-        </a>
       </div>
     </div>
 
-    <!-- Navigation Tabs -->
-    <div class="bg-slate-900 border-t border-slate-800">
-      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-8 overflow-x-auto text-sm">
-        <button onclick="switchTab('dashboard')" id="nav-dashboard" class="py-3 px-1 border-b-2 tab-active transition flex items-center gap-2 whitespace-nowrap">
-          <i class="fa-solid fa-house"></i> Dashboard
+    <!-- Navigation Tabs Bar -->
+    <div class="bg-slate-950/70 border-t border-slate-800/60 backdrop-blur-sm">
+      <div class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 flex space-x-2 sm:space-x-6 overflow-x-auto text-xs sm:text-sm font-medium py-1">
+        <button onclick="switchTab('dashboard')" id="nav-dashboard" class="py-2.5 px-3.5 rounded-lg tab-active transition-all flex items-center gap-2 whitespace-nowrap">
+          <i class="fa-solid fa-chart-pie text-xs"></i> Executive Dashboard
         </button>
-        <button onclick="switchTab('analysis')" id="nav-analysis" class="py-3 px-1 border-b-2 tab-inactive transition flex items-center gap-2 whitespace-nowrap">
-          <i class="fa-solid fa-chart-simple"></i> Crime Analysis
+        <button onclick="switchTab('analysis')" id="nav-analysis" class="py-2.5 px-3.5 rounded-lg tab-inactive transition-all flex items-center gap-2 whitespace-nowrap">
+          <i class="fa-solid fa-database text-xs"></i> Dataset & DBSCAN
         </button>
-        <button onclick="switchTab('map')" id="nav-map" class="py-3 px-1 border-b-2 tab-inactive transition flex items-center gap-2 whitespace-nowrap">
-          <i class="fa-solid fa-map-location-dot"></i> Hotspot Map
+        <button onclick="switchTab('map')" id="nav-map" class="py-2.5 px-3.5 rounded-lg tab-inactive transition-all flex items-center gap-2 whitespace-nowrap">
+          <i class="fa-solid fa-map-location-dot text-xs"></i> Interactive Hotspot Map
         </button>
-        <button onclick="switchTab('prediction')" id="nav-prediction" class="py-3 px-1 border-b-2 tab-inactive transition flex items-center gap-2 whitespace-nowrap">
-          <i class="fa-solid fa-wand-magic-sparkles"></i> ML Prediction
+        <button onclick="switchTab('prediction')" id="nav-prediction" class="py-2.5 px-3.5 rounded-lg tab-inactive transition-all flex items-center gap-2 whitespace-nowrap">
+          <i class="fa-solid fa-wand-magic-sparkles text-xs"></i> ML Risk Predictor
         </button>
-        <button onclick="switchTab('performance')" id="nav-performance" class="py-3 px-1 border-b-2 tab-inactive transition flex items-center gap-2 whitespace-nowrap">
-          <i class="fa-solid fa-chart-line"></i> Model Performance
+        <button onclick="switchTab('performance')" id="nav-performance" class="py-2.5 px-3.5 rounded-lg tab-inactive transition-all flex items-center gap-2 whitespace-nowrap">
+          <i class="fa-solid fa-shield-halved text-xs"></i> Model Diagnostics
         </button>
       </div>
     </div>
   </header>
 
   <!-- ======================================================== -->
-  <!-- Main Container -->
+  <!-- Main Application Body -->
   <!-- ======================================================== -->
-  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 flex-1 w-full">
+  <main class="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-7 flex-1 w-full space-y-6">
 
+    <!-- ======================================================== -->
     <!-- TAB 1: DASHBOARD -->
+    <!-- ======================================================== -->
     <section id="tab-dashboard" class="space-y-6">
-      <!-- KPI Row -->
+      
+      <!-- KPI Row (Modern Elevated Stat Cards) -->
       <div class="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
-        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-blue-600">
-          <div class="text-xs uppercase text-slate-500 font-semibold tracking-wider">Total Records</div>
-          <div id="kpi-total" class="text-2xl font-bold text-blue-700 mt-1">...</div>
-          <div class="text-[11px] text-slate-400 mt-0.5">Crime incidents</div>
+        
+        <!-- Total Incidents -->
+        <div class="glass-card kpi-card p-4 rounded-2xl border-l-4 border-blue-600 flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] uppercase tracking-wider font-bold text-slate-500">Total Crimes</span>
+            <div class="w-7 h-7 rounded-lg bg-blue-50 text-blue-600 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-folder-open"></i>
+            </div>
+          </div>
+          <div class="my-1.5">
+            <div id="kpi-total" class="text-2xl font-extrabold text-slate-900 tracking-tight">...</div>
+            <div class="text-[11px] text-slate-500 font-medium">Validated incidents</div>
+          </div>
+          <div class="text-[10px] text-emerald-600 font-semibold flex items-center gap-1">
+            <i class="fa-solid fa-check"></i> 100% Ingested
+          </div>
         </div>
-        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-indigo-600">
-          <div class="text-xs uppercase text-slate-500 font-semibold tracking-wider">Categories</div>
-          <div id="kpi-categories" class="text-2xl font-bold text-indigo-700 mt-1">...</div>
-          <div class="text-[11px] text-slate-400 mt-0.5">Distinct types</div>
+
+        <!-- Crime Classes -->
+        <div class="glass-card kpi-card p-4 rounded-2xl border-l-4 border-cyan-600 flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] uppercase tracking-wider font-bold text-slate-500">Crime Types</span>
+            <div class="w-7 h-7 rounded-lg bg-cyan-50 text-cyan-600 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-tags"></i>
+            </div>
+          </div>
+          <div class="my-1.5">
+            <div id="kpi-categories" class="text-2xl font-extrabold text-slate-900 tracking-tight">...</div>
+            <div class="text-[11px] text-slate-500 font-medium">Distinct categories</div>
+          </div>
+          <div class="text-[10px] text-cyan-700 font-semibold">Urban classifications</div>
         </div>
-        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-rose-600">
-          <div class="text-xs uppercase text-slate-500 font-semibold tracking-wider">🔴 High Risk</div>
-          <div id="kpi-high" class="text-2xl font-bold text-rose-700 mt-1">...</div>
-          <div id="kpi-high-pct" class="text-[11px] text-slate-400 mt-0.5">...</div>
+
+        <!-- High Risk -->
+        <div class="glass-card kpi-card p-4 rounded-2xl border-l-4 border-rose-600 flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] uppercase tracking-wider font-bold text-rose-600 flex items-center gap-1">
+              <i class="fa-solid fa-fire text-xs"></i> High Risk
+            </span>
+            <div class="w-7 h-7 rounded-lg bg-rose-50 text-rose-600 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-triangle-exclamation"></i>
+            </div>
+          </div>
+          <div class="my-1.5">
+            <div id="kpi-high" class="text-2xl font-extrabold text-rose-600 tracking-tight">...</div>
+            <div id="kpi-high-pct" class="text-[11px] text-slate-500 font-medium">...</div>
+          </div>
+          <div class="text-[10px] text-rose-600 font-semibold">Priority Hotspots</div>
         </div>
-        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-amber-600">
-          <div class="text-xs uppercase text-slate-500 font-semibold tracking-wider">🟠 Medium Risk</div>
-          <div id="kpi-med" class="text-2xl font-bold text-amber-700 mt-1">...</div>
-          <div id="kpi-med-pct" class="text-[11px] text-slate-400 mt-0.5">...</div>
+
+        <!-- Medium Risk -->
+        <div class="glass-card kpi-card p-4 rounded-2xl border-l-4 border-amber-500 flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] uppercase tracking-wider font-bold text-amber-600 flex items-center gap-1">
+              <i class="fa-solid fa-bolt text-xs"></i> Medium
+            </span>
+            <div class="w-7 h-7 rounded-lg bg-amber-50 text-amber-600 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-bell"></i>
+            </div>
+          </div>
+          <div class="my-1.5">
+            <div id="kpi-med" class="text-2xl font-extrabold text-amber-600 tracking-tight">...</div>
+            <div id="kpi-med-pct" class="text-[11px] text-slate-500 font-medium">...</div>
+          </div>
+          <div class="text-[10px] text-amber-600 font-semibold">Elevated vigilance</div>
         </div>
-        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-emerald-600">
-          <div class="text-xs uppercase text-slate-500 font-semibold tracking-wider">🟢 Low Risk</div>
-          <div id="kpi-low" class="text-2xl font-bold text-emerald-700 mt-1">...</div>
-          <div id="kpi-low-pct" class="text-[11px] text-slate-400 mt-0.5">...</div>
+
+        <!-- Low Risk -->
+        <div class="glass-card kpi-card p-4 rounded-2xl border-l-4 border-emerald-500 flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] uppercase tracking-wider font-bold text-emerald-600 flex items-center gap-1">
+              <i class="fa-solid fa-shield text-xs"></i> Low Risk
+            </span>
+            <div class="w-7 h-7 rounded-lg bg-emerald-50 text-emerald-600 flex items-center justify-center text-xs">
+              <i class="fa-solid fa-check-double"></i>
+            </div>
+          </div>
+          <div class="my-1.5">
+            <div id="kpi-low" class="text-2xl font-extrabold text-emerald-600 tracking-tight">...</div>
+            <div id="kpi-low-pct" class="text-[11px] text-slate-500 font-medium">...</div>
+          </div>
+          <div class="text-[10px] text-emerald-600 font-semibold">Normal baseline</div>
         </div>
-        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-slate-600">
-          <div class="text-xs uppercase text-slate-500 font-semibold tracking-wider">Date Range</div>
-          <div id="kpi-dates" class="text-xs font-bold text-slate-700 mt-2">...</div>
-          <div class="text-[11px] text-slate-400 mt-1">Coverage period</div>
+
+        <!-- Date Range -->
+        <div class="glass-card kpi-card p-4 rounded-2xl border-l-4 border-slate-600 flex flex-col justify-between">
+          <div class="flex items-center justify-between">
+            <span class="text-[11px] uppercase tracking-wider font-bold text-slate-500">Timeline</span>
+            <div class="w-7 h-7 rounded-lg bg-slate-100 text-slate-600 flex items-center justify-center text-xs">
+              <i class="fa-regular fa-calendar-days"></i>
+            </div>
+          </div>
+          <div class="my-1.5">
+            <div id="kpi-dates" class="text-xs font-bold text-slate-800 leading-tight">...</div>
+            <div class="text-[11px] text-slate-500 font-medium mt-1">Temporal span</div>
+          </div>
+          <div class="text-[10px] text-slate-500 font-semibold">Sequential logging</div>
         </div>
       </div>
 
-      <!-- Charts Row 1 -->
+      <!-- Charts Row 1: Category Bar & Trend Line -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-          <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-            <i class="fa-solid fa-chart-column text-blue-600"></i> Crime Distribution by Category
-          </h3>
+        <div class="glass-card p-6 rounded-2xl">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <i class="fa-solid fa-chart-column text-blue-600"></i> Crime Volume by Category
+              </h3>
+              <p class="text-xs text-slate-500">Incident breakdown across major crime types</p>
+            </div>
+            <span class="text-[11px] bg-slate-100 text-slate-600 px-2.5 py-1 rounded-md font-semibold">Volume ranking</span>
+          </div>
           <div class="h-64"><canvas id="chart-category"></canvas></div>
         </div>
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-          <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-            <i class="fa-solid fa-chart-line text-blue-600"></i> Monthly Crime Trend
-          </h3>
+
+        <div class="glass-card p-6 rounded-2xl">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+                <i class="fa-solid fa-chart-line text-blue-600"></i> Monthly Spatio-Temporal Trajectory
+              </h3>
+              <p class="text-xs text-slate-500">Incident progression across temporal aggregation</p>
+            </div>
+            <span class="text-[11px] bg-blue-50 text-blue-600 px-2.5 py-1 rounded-md font-semibold">Timeline trend</span>
+          </div>
           <div class="h-64"><canvas id="chart-trend"></canvas></div>
         </div>
       </div>
 
-      <!-- Charts Row 2 -->
+      <!-- Charts Row 2: Risk Pie, Hourly & Weekday -->
       <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-          <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-            <i class="fa-solid fa-chart-pie text-rose-600"></i> Risk Distribution
+        <div class="glass-card p-6 rounded-2xl">
+          <h3 class="text-sm font-bold text-slate-800 mb-1 flex items-center gap-2">
+            <i class="fa-solid fa-chart-pie text-rose-600"></i> Risk Stratification
           </h3>
+          <p class="text-xs text-slate-500 mb-4">Distribution across severity levels</p>
           <div class="h-56"><canvas id="chart-risk"></canvas></div>
         </div>
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-          <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-            <i class="fa-solid fa-clock text-amber-600"></i> Crime by Hour of Day
+
+        <div class="glass-card p-6 rounded-2xl">
+          <h3 class="text-sm font-bold text-slate-800 mb-1 flex items-center gap-2">
+            <i class="fa-solid fa-clock text-amber-500"></i> Diurnal Hourly Curve
           </h3>
+          <p class="text-xs text-slate-500 mb-4">Crimes grouped by hour of the day (0–23)</p>
           <div class="h-56"><canvas id="chart-hour"></canvas></div>
         </div>
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-          <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-            <i class="fa-solid fa-calendar-week text-indigo-600"></i> Crime by Day of Week
+
+        <div class="glass-card p-6 rounded-2xl">
+          <h3 class="text-sm font-bold text-slate-800 mb-1 flex items-center gap-2">
+            <i class="fa-solid fa-calendar-week text-indigo-600"></i> Weekly Cycle Frequency
           </h3>
+          <p class="text-xs text-slate-500 mb-4">Incident frequency across Monday–Sunday</p>
           <div class="h-56"><canvas id="chart-dow"></canvas></div>
         </div>
       </div>
 
       <!-- Top Hotspots Table -->
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-        <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-          <i class="fa-solid fa-fire text-orange-600"></i> Top 10 Crime Hotspot Locations
-        </h3>
-        <div class="overflow-x-auto">
+      <div class="glass-card p-6 rounded-2xl">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
+              <i class="fa-solid fa-fire text-rose-600"></i> Top 10 Crime Density Epicenters
+            </h3>
+            <p class="text-xs text-slate-500">Identified dense urban zones ranked by cumulative incidents</p>
+          </div>
+          <span class="text-[11px] bg-rose-50 text-rose-700 px-3 py-1 rounded-full font-semibold border border-rose-100">
+            Critical Hotspot Registry
+          </span>
+        </div>
+
+        <div class="overflow-x-auto rounded-xl border border-slate-200">
           <table class="min-w-full text-xs text-left">
-            <thead class="bg-slate-50 text-slate-500 uppercase border-b">
+            <thead class="bg-slate-50/80 text-slate-600 uppercase text-[11px] font-bold border-b border-slate-200">
               <tr>
-                <th class="py-2.5 px-3">#</th>
-                <th class="py-2.5 px-3">Location Name</th>
-                <th class="py-2.5 px-3">Total Crimes</th>
-                <th class="py-2.5 px-3">Most Frequent Crime</th>
-                <th class="py-2.5 px-3">Risk Assessment</th>
+                <th class="py-3 px-4">Rank</th>
+                <th class="py-3 px-4">Location Name</th>
+                <th class="py-3 px-4">Total Incidents</th>
+                <th class="py-3 px-4">Dominant Incident Class</th>
+                <th class="py-3 px-4">Threat Level</th>
               </tr>
             </thead>
-            <tbody id="table-top-hotspots" class="divide-y divide-slate-100">
-              <tr><td colspan="5" class="py-4 text-center text-slate-400">Loading top hotspot areas...</td></tr>
+            <tbody id="table-top-hotspots" class="divide-y divide-slate-100 text-slate-700">
+              <tr><td colspan="5" class="py-6 text-center text-slate-400">Loading top hotspot areas...</td></tr>
             </tbody>
           </table>
         </div>
       </div>
     </section>
 
-    <!-- TAB 2: CRIME ANALYSIS -->
+    <!-- ======================================================== -->
+    <!-- TAB 2: CRIME ANALYSIS & DBSCAN -->
+    <!-- ======================================================== -->
     <section id="tab-analysis" class="space-y-6 hidden">
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+      <div class="glass-card p-6 rounded-2xl">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
           <div>
-            <h2 class="text-base font-bold text-slate-800">📂 Crime Dataset Browser & Filtering</h2>
-            <p class="text-xs text-slate-500">Filter, inspect, and export clean crime incident data</p>
+            <h2 class="text-base font-extrabold text-slate-800 flex items-center gap-2">
+              <i class="fa-solid fa-database text-blue-600"></i> Dataset Browser & Spatio-Temporal Queries
+            </h2>
+            <p class="text-xs text-slate-500">Query, inspect, and export clean crime incident records</p>
           </div>
-          <div class="flex flex-wrap items-center gap-3">
-            <select id="analysis-crime-filter" onchange="loadAnalysisData()" class="text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
-              <option value="All">All Crime Types</option>
+          <div class="flex flex-wrap items-center gap-2.5">
+            <select id="analysis-crime-filter" onchange="loadAnalysisData()" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium">
+              <option value="All">All Incident Types</option>
             </select>
-            <select id="analysis-limit" onchange="loadAnalysisData()" class="text-xs bg-slate-50 border border-slate-300 rounded-lg px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500">
+            <select id="analysis-limit" onchange="loadAnalysisData()" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-2 text-slate-700 focus:outline-none focus:ring-2 focus:ring-blue-500 font-medium">
               <option value="50">50 Rows</option>
               <option value="100" selected>100 Rows</option>
-              <option value="200">200 Rows</option>
+              <option value="250">250 Rows</option>
             </select>
-            <button onclick="downloadCSV()" class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3 py-2 rounded-lg font-medium transition shadow flex items-center gap-1.5">
+            <button onclick="downloadCSV()" class="text-xs bg-emerald-600 hover:bg-emerald-500 text-white px-3.5 py-2 rounded-lg font-semibold transition shadow-sm flex items-center gap-1.5">
               <i class="fa-solid fa-file-csv"></i> Download CSV
             </button>
           </div>
         </div>
 
-        <div class="overflow-x-auto max-h-96">
+        <div class="overflow-x-auto max-h-96 rounded-xl border border-slate-200">
           <table class="min-w-full text-xs text-left">
-            <thead class="bg-slate-100 text-slate-600 uppercase border-b sticky top-0 z-10">
+            <thead class="bg-slate-100/90 text-slate-700 uppercase text-[10.5px] font-bold border-b border-slate-200 sticky top-0 z-10 backdrop-blur-sm">
               <tr>
-                <th class="py-2.5 px-3">Date</th>
-                <th class="py-2.5 px-3">Time</th>
-                <th class="py-2.5 px-3">Crime Type</th>
-                <th class="py-2.5 px-3">Location</th>
-                <th class="py-2.5 px-3">Latitude</th>
-                <th class="py-2.5 px-3">Longitude</th>
-                <th class="py-2.5 px-3">Risk Level</th>
+                <th class="py-3 px-3.5">Date</th>
+                <th class="py-3 px-3.5">Time</th>
+                <th class="py-3 px-3.5">Crime Modality</th>
+                <th class="py-3 px-3.5">Location</th>
+                <th class="py-3 px-3.5">Latitude</th>
+                <th class="py-3 px-3.5">Longitude</th>
+                <th class="py-3 px-3.5">Assigned Risk</th>
               </tr>
             </thead>
             <tbody id="table-analysis" class="divide-y divide-slate-100">
-              <tr><td colspan="7" class="py-4 text-center text-slate-400">Loading dataset records...</td></tr>
+              <tr><td colspan="7" class="py-6 text-center text-slate-400">Loading dataset records...</td></tr>
             </tbody>
           </table>
         </div>
       </div>
 
-      <!-- DBSCAN Clustering Section -->
-      <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-4">
+      <!-- DBSCAN Clustering Panel -->
+      <div class="glass-card p-6 rounded-2xl">
+        <div class="flex flex-col md:flex-row md:items-center justify-between gap-4 mb-5">
           <div>
             <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2">
-              <i class="fa-solid fa-circle-nodes text-blue-600"></i> DBSCAN Geospatial Clustering
+              <i class="fa-solid fa-circle-nodes text-blue-600"></i> DBSCAN Geospatial Density Clustering
             </h3>
-            <p class="text-xs text-slate-500">Density-based spatial clustering of crime locations (Haversine metric)</p>
+            <p class="text-xs text-slate-500">Haversine metric clustering to extract dense crime clusters from spatial noise</p>
           </div>
-          <div class="flex items-center gap-3">
-            <label class="text-xs text-slate-600">Radius: <span id="eps-val">0.5</span> km</label>
-            <input type="range" id="input-eps" min="0.2" max="2.0" step="0.1" value="0.5" oninput="document.getElementById('eps-val').innerText = this.value" class="w-24">
-            <button onclick="loadClusters()" class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-3 py-2 rounded-lg font-medium transition shadow">
-              Run Clustering
+          <div class="flex flex-wrap items-center gap-3">
+            <div class="flex items-center gap-2 bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5">
+              <span class="text-xs font-semibold text-slate-600">Radius: <b id="eps-val" class="text-blue-600">0.5</b> km</span>
+              <input type="range" id="input-eps" min="0.2" max="2.0" step="0.1" value="0.5" oninput="document.getElementById('eps-val').innerText = this.value" class="w-24 accent-blue-600">
+            </div>
+            <button onclick="loadClusters()" class="text-xs bg-blue-600 hover:bg-blue-500 text-white px-4 py-2 rounded-lg font-semibold transition shadow-sm">
+              ⚡ Execute DBSCAN
             </button>
           </div>
         </div>
 
-        <div class="overflow-x-auto">
+        <div class="overflow-x-auto rounded-xl border border-slate-200">
           <table class="min-w-full text-xs text-left">
-            <thead class="bg-slate-50 text-slate-600 uppercase border-b">
+            <thead class="bg-slate-50 text-slate-600 uppercase text-[10.5px] font-bold border-b border-slate-200">
               <tr>
-                <th class="py-2 px-3">Cluster ID</th>
-                <th class="py-2 px-3">Crimes Count</th>
-                <th class="py-2 px-3">Centroid (Lat, Lon)</th>
-                <th class="py-2 px-3">Top Crime Type</th>
-                <th class="py-2 px-3">Assigned Risk</th>
+                <th class="py-2.5 px-3.5">Cluster ID</th>
+                <th class="py-2.5 px-3.5">Incidents Count</th>
+                <th class="py-2.5 px-3.5">Centroid (Lat, Lon)</th>
+                <th class="py-2.5 px-3.5">Top Crime Type</th>
+                <th class="py-2.5 px-3.5">Severity</th>
               </tr>
             </thead>
             <tbody id="table-clusters" class="divide-y divide-slate-100">
-              <tr><td colspan="5" class="py-4 text-center text-slate-400">Click 'Run Clustering' to compute density clusters.</td></tr>
+              <tr><td colspan="5" class="py-6 text-center text-slate-400">Click 'Execute DBSCAN' to re-compute spatial density clusters.</td></tr>
             </tbody>
           </table>
         </div>
       </div>
     </section>
 
+    <!-- ======================================================== -->
     <!-- TAB 3: HOTSPOT MAP -->
+    <!-- ======================================================== -->
     <section id="tab-map" class="space-y-6 hidden">
-      <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200 flex flex-wrap items-center justify-between gap-4">
-        <div class="flex items-center space-x-4">
-          <span class="text-xs font-semibold text-slate-500 uppercase tracking-wider">Map Layers:</span>
-          <label class="inline-flex items-center text-xs text-slate-700 cursor-pointer">
-            <input type="checkbox" id="layer-heatmap" checked onchange="toggleLayers()" class="rounded text-blue-600 mr-1.5">
-            🌡 Heatmap
+      
+      <!-- Map Controls Header -->
+      <div class="glass-card p-4 rounded-2xl flex flex-wrap items-center justify-between gap-4">
+        <div class="flex flex-wrap items-center gap-5">
+          <span class="text-xs font-extrabold text-slate-500 uppercase tracking-wider flex items-center gap-1.5">
+            <i class="fa-solid fa-layer-group text-blue-600"></i> Map Layers:
+          </span>
+          <label class="inline-flex items-center text-xs font-medium text-slate-700 cursor-pointer select-none">
+            <input type="checkbox" id="layer-heatmap" checked onchange="toggleLayers()" class="rounded text-blue-600 mr-2 accent-blue-600">
+            🌡 Heatmap Density
           </label>
-          <label class="inline-flex items-center text-xs text-slate-700 cursor-pointer">
-            <input type="checkbox" id="layer-markers" checked onchange="toggleLayers()" class="rounded text-blue-600 mr-1.5">
-            📍 Crime Markers
+          <label class="inline-flex items-center text-xs font-medium text-slate-700 cursor-pointer select-none">
+            <input type="checkbox" id="layer-markers" checked onchange="toggleLayers()" class="rounded text-blue-600 mr-2 accent-blue-600">
+            📍 Crime Markers Cluster
           </label>
-          <label class="inline-flex items-center text-xs text-slate-700 cursor-pointer">
-            <input type="checkbox" id="layer-clusters" checked onchange="toggleLayers()" class="rounded text-blue-600 mr-1.5">
-            🔵 Density Clusters
+          <label class="inline-flex items-center text-xs font-medium text-slate-700 cursor-pointer select-none">
+            <input type="checkbox" id="layer-clusters" checked onchange="toggleLayers()" class="rounded text-blue-600 mr-2 accent-blue-600">
+            🔵 DBSCAN Centroid Buffers
           </label>
         </div>
         <div class="flex items-center space-x-2">
-          <label class="text-xs text-slate-500">Filter:</label>
-          <select id="map-crime-filter" onchange="loadMapData()" class="text-xs bg-slate-50 border border-slate-300 rounded px-2.5 py-1.5">
-            <option value="All">All Crimes</option>
+          <label class="text-xs font-bold text-slate-500 uppercase">Crime Filter:</label>
+          <select id="map-crime-filter" onchange="loadMapData()" class="text-xs bg-slate-50 border border-slate-200 rounded-lg px-3 py-1.5 font-medium text-slate-700 focus:outline-none focus:ring-1 focus:ring-blue-500">
+            <option value="All">All Incident Types</option>
           </select>
         </div>
       </div>
 
       <!-- Map & Search Layout -->
       <div class="grid grid-cols-1 lg:grid-cols-4 gap-6">
-        <!-- Map Panel -->
-        <div class="lg:col-span-3 bg-white p-2 rounded-xl shadow-sm border border-slate-200">
+        
+        <!-- Interactive Map Container -->
+        <div class="lg:col-span-3 glass-card p-2 rounded-2xl shadow-sm">
           <div id="hotspot-map" class="map-container"></div>
         </div>
 
         <!-- Location Search & Assessment Panel -->
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200 flex flex-col justify-between space-y-4">
+        <div class="glass-card p-5 rounded-2xl flex flex-col justify-between space-y-4">
           <div>
             <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2 mb-1">
-              <i class="fa-solid fa-location-crosshairs text-blue-600"></i> Location Risk Search
+              <i class="fa-solid fa-location-crosshairs text-blue-600"></i> Radial Point Query
             </h3>
-            <p class="text-xs text-slate-500 mb-3">Enter coordinates or click directly on map to assess local risk.</p>
+            <p class="text-xs text-slate-500 mb-4">Click anywhere on the map or input target coordinates.</p>
 
-            <div class="space-y-3">
+            <div class="space-y-3.5">
               <div>
-                <label class="text-[11px] font-semibold text-slate-600 uppercase">Latitude</label>
-                <input type="number" id="search-lat" value="40.7128" step="0.0001" class="w-full text-xs p-2 border border-slate-300 rounded mt-0.5 focus:ring-1 focus:ring-blue-500">
+                <label class="text-[10.5px] font-bold text-slate-500 uppercase">Latitude</label>
+                <input type="number" id="search-lat" value="40.7128" step="0.0001" class="w-full text-xs font-mono p-2.5 bg-slate-50 border border-slate-200 rounded-lg mt-1 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none">
               </div>
               <div>
-                <label class="text-[11px] font-semibold text-slate-600 uppercase">Longitude</label>
-                <input type="number" id="search-lon" value="-74.0060" step="0.0001" class="w-full text-xs p-2 border border-slate-300 rounded mt-0.5 focus:ring-1 focus:ring-blue-500">
+                <label class="text-[10.5px] font-bold text-slate-500 uppercase">Longitude</label>
+                <input type="number" id="search-lon" value="-74.0060" step="0.0001" class="w-full text-xs font-mono p-2.5 bg-slate-50 border border-slate-200 rounded-lg mt-1 focus:ring-2 focus:ring-blue-500 focus:bg-white outline-none">
               </div>
               <div>
-                <label class="text-[11px] font-semibold text-slate-600 uppercase">Search Radius: <span id="radius-val">1.0</span> km</label>
-                <input type="range" id="search-radius" min="0.5" max="5.0" step="0.5" value="1.0" oninput="document.getElementById('radius-val').innerText = this.value" class="w-full mt-1">
+                <div class="flex justify-between items-center text-[10.5px] font-bold text-slate-500 uppercase">
+                  <span>Buffer Radius</span>
+                  <span id="radius-val" class="text-blue-600 font-extrabold">1.0 km</span>
+                </div>
+                <input type="range" id="search-radius" min="0.5" max="5.0" step="0.5" value="1.0" oninput="document.getElementById('radius-val').innerText = this.value + ' km'" class="w-full mt-1.5 accent-blue-600">
               </div>
-              <button onclick="searchLocation()" class="w-full text-xs bg-blue-600 hover:bg-blue-500 text-white font-semibold py-2.5 rounded-lg shadow transition">
-                🔍 Analyse Location
+              <button onclick="searchLocation()" class="w-full text-xs bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-2.5 rounded-lg shadow-md transition">
+                🔍 Evaluate Location Risk
               </button>
             </div>
           </div>
 
           <!-- Result Box -->
-          <div id="search-result-box" class="hidden p-4 rounded-lg border-l-4">
-            <div class="text-[10px] uppercase font-bold tracking-wider" id="search-result-header">ASSESSMENT</div>
-            <div class="text-xl font-bold mt-1" id="search-result-risk">Low Risk</div>
-            <div class="text-xs mt-2 space-y-1 text-slate-600">
-              <div>📊 Confidence: <b id="search-result-conf">0%</b></div>
-              <div>🔢 Nearby Incidents: <b id="search-result-count">0</b></div>
-              <div>🏆 Dominant Crime: <b id="search-result-top">None</b></div>
+          <div id="search-result-box" class="hidden p-4 rounded-xl border-l-4">
+            <div class="text-[10px] uppercase font-bold tracking-wider" id="search-result-header">ASSESSMENT SUMMARY</div>
+            <div class="text-xl font-extrabold mt-1" id="search-result-risk">Low Risk</div>
+            <div class="text-xs mt-2 space-y-1.5 text-slate-700">
+              <div class="flex justify-between"><span>Confidence:</span> <b id="search-result-conf" class="font-bold">0%</b></div>
+              <div class="flex justify-between"><span>Nearby Crimes:</span> <b id="search-result-count" class="font-bold">0</b></div>
+              <div class="flex justify-between"><span>Dominant Type:</span> <b id="search-result-top" class="font-bold">None</b></div>
             </div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- TAB 4: ML PREDICTION -->
+    <!-- ======================================================== -->
+    <!-- TAB 4: ML RISK PREDICTOR -->
+    <!-- ======================================================== -->
     <section id="tab-prediction" class="space-y-6 hidden">
       <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        
         <!-- Single Point Form -->
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
+        <div class="glass-card p-6 rounded-2xl">
           <h3 class="text-sm font-bold text-slate-800 flex items-center gap-2 mb-1">
-            <i class="fa-solid fa-wand-magic-sparkles text-blue-600"></i> Single Location ML Predictor
+            <i class="fa-solid fa-wand-magic-sparkles text-blue-600"></i> Random Forest Point Forecaster
           </h3>
-          <p class="text-xs text-slate-500 mb-4">Run the Random Forest classifier for specific spatial & temporal inputs.</p>
+          <p class="text-xs text-slate-500 mb-5">Predict multi-class risk level for spatial, cyclical temporal & contextual inputs.</p>
 
-          <form onsubmit="predictSingleLocation(event)" class="space-y-3">
-            <div class="grid grid-cols-2 gap-2">
+          <form onsubmit="predictSingleLocation(event)" class="space-y-3.5">
+            <div class="grid grid-cols-2 gap-2.5">
               <div>
-                <label class="text-[11px] font-semibold text-slate-600">Latitude</label>
-                <input type="number" id="pred-lat" value="40.7128" step="0.0001" required class="w-full text-xs p-2 border border-slate-300 rounded mt-0.5">
+                <label class="text-[10.5px] font-bold text-slate-500 uppercase">Latitude</label>
+                <input type="number" id="pred-lat" value="40.7128" step="0.0001" required class="w-full text-xs font-mono p-2.5 bg-slate-50 border border-slate-200 rounded-lg mt-1 focus:ring-1 focus:ring-blue-500">
               </div>
               <div>
-                <label class="text-[11px] font-semibold text-slate-600">Longitude</label>
-                <input type="number" id="pred-lon" value="-74.0060" step="0.0001" required class="w-full text-xs p-2 border border-slate-300 rounded mt-0.5">
+                <label class="text-[10.5px] font-bold text-slate-500 uppercase">Longitude</label>
+                <input type="number" id="pred-lon" value="-74.0060" step="0.0001" required class="w-full text-xs font-mono p-2.5 bg-slate-50 border border-slate-200 rounded-lg mt-1 focus:ring-1 focus:ring-blue-500">
               </div>
             </div>
 
-            <div class="grid grid-cols-2 gap-2">
+            <div class="grid grid-cols-2 gap-2.5">
               <div>
-                <label class="text-[11px] font-semibold text-slate-600">Month</label>
-                <select id="pred-month" class="w-full text-xs p-2 border border-slate-300 rounded mt-0.5">
+                <label class="text-[10.5px] font-bold text-slate-500 uppercase">Month</label>
+                <select id="pred-month" class="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg mt-1 font-medium">
                   <option value="1">Jan</option><option value="2">Feb</option><option value="3">Mar</option>
                   <option value="4">Apr</option><option value="5">May</option><option value="6" selected>Jun</option>
                   <option value="7">Jul</option><option value="8">Aug</option><option value="9">Sep</option>
@@ -371,14 +590,14 @@
                 </select>
               </div>
               <div>
-                <label class="text-[11px] font-semibold text-slate-600">Hour (0-23)</label>
-                <input type="number" id="pred-hour" min="0" max="23" value="14" class="w-full text-xs p-2 border border-slate-300 rounded mt-0.5">
+                <label class="text-[10.5px] font-bold text-slate-500 uppercase">Hour (0–23)</label>
+                <input type="number" id="pred-hour" min="0" max="23" value="14" class="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg mt-1 font-medium">
               </div>
             </div>
 
             <div>
-              <label class="text-[11px] font-semibold text-slate-600">Crime Context Type</label>
-              <select id="pred-crime" class="w-full text-xs p-2 border border-slate-300 rounded mt-0.5">
+              <label class="text-[10.5px] font-bold text-slate-500 uppercase">Crime Category Context</label>
+              <select id="pred-crime" class="w-full text-xs p-2.5 bg-slate-50 border border-slate-200 rounded-lg mt-1 font-medium">
                 <option value="Theft">Theft</option>
                 <option value="Assault">Assault</option>
                 <option value="Burglary">Burglary</option>
@@ -387,8 +606,8 @@
               </select>
             </div>
 
-            <button type="submit" class="w-full text-xs bg-gradient-to-r from-blue-700 to-indigo-700 hover:from-blue-600 hover:to-indigo-600 text-white font-semibold py-2.5 rounded-lg shadow transition mt-2">
-              🔮 Predict Risk Level
+            <button type="submit" class="w-full text-xs bg-gradient-to-r from-blue-600 via-indigo-600 to-blue-700 hover:from-blue-500 hover:to-indigo-500 text-white font-bold py-3 rounded-lg shadow-md transition mt-2">
+              🔮 Run ML Risk Inference
             </button>
           </form>
         </div>
@@ -396,11 +615,12 @@
         <!-- Prediction Result Display -->
         <div class="lg:col-span-2 space-y-4">
           <div id="pred-result-container" class="grid grid-cols-1 md:grid-cols-3 gap-4">
+            
             <!-- ML Card -->
-            <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-slate-300" id="card-ml">
-              <div class="text-[10px] text-slate-400 uppercase font-bold">1. ML MODEL PREDICTION</div>
-              <div class="text-xl font-bold mt-1 text-slate-700" id="pred-ml-risk">—</div>
-              <div class="text-xs text-slate-600 mt-2 space-y-0.5" id="pred-ml-probs">
+            <div class="glass-card p-4 rounded-2xl border-l-4 border-slate-300" id="card-ml">
+              <div class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">1. Random Forest</div>
+              <div class="text-xl font-extrabold mt-1 text-slate-800" id="pred-ml-risk">—</div>
+              <div class="text-xs text-slate-600 mt-2.5 space-y-1" id="pred-ml-probs">
                 <div>Confidence: —</div>
                 <div>P(Low): —</div>
                 <div>P(Med): —</div>
@@ -409,94 +629,102 @@
             </div>
 
             <!-- Historical Card -->
-            <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-slate-300" id="card-geo">
-              <div class="text-[10px] text-slate-400 uppercase font-bold">2. HISTORICAL SPATIAL DENSITY</div>
-              <div class="text-xl font-bold mt-1 text-slate-700" id="pred-geo-risk">—</div>
-              <div class="text-xs text-slate-600 mt-2 space-y-0.5" id="pred-geo-info">
+            <div class="glass-card p-4 rounded-2xl border-l-4 border-slate-300" id="card-geo">
+              <div class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">2. Spatial Density</div>
+              <div class="text-xl font-extrabold mt-1 text-slate-800" id="pred-geo-risk">—</div>
+              <div class="text-xs text-slate-600 mt-2.5 space-y-1" id="pred-geo-info">
                 <div>Nearby Incidents: —</div>
-                <div>Dominant Crime: —</div>
-                <div>Radius: 1.0 km</div>
+                <div>Dominant Type: —</div>
+                <div>Buffer: 1.0 km</div>
               </div>
             </div>
 
             <!-- Combined Card -->
-            <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-slate-300" id="card-combined">
-              <div class="text-[10px] text-slate-400 uppercase font-bold">3. COMBINED RISK SCORE</div>
-              <div class="text-xl font-bold mt-1 text-slate-700" id="pred-comb-risk">—</div>
-              <div class="text-xs text-slate-600 mt-2" id="pred-comb-info">
-                Submit form on the left to calculate combined risk assessment.
+            <div class="glass-card p-4 rounded-2xl border-l-4 border-slate-300" id="card-combined">
+              <div class="text-[10px] text-slate-400 uppercase font-bold tracking-wider">3. Synthesized Score</div>
+              <div class="text-xl font-extrabold mt-1 text-slate-800" id="pred-comb-risk">—</div>
+              <div class="text-xs text-slate-600 mt-2.5" id="pred-comb-info">
+                Submit target parameters on the left to compute combined spatial risk score.
               </div>
             </div>
           </div>
 
           <!-- Mini Map Preview -->
-          <div class="bg-white p-3 rounded-xl shadow-sm border border-slate-200">
-            <h4 class="text-xs font-semibold text-slate-600 mb-2">Location Visual Preview</h4>
-            <div id="pred-minimap" class="h-64 w-full rounded-lg"></div>
+          <div class="glass-card p-3 rounded-2xl">
+            <h4 class="text-xs font-bold text-slate-600 mb-2 px-1 flex items-center gap-1.5">
+              <i class="fa-solid fa-map-pin text-blue-600"></i> Spatial Vicinity & Buffer Inspection
+            </h4>
+            <div id="pred-minimap" class="h-64 w-full rounded-xl"></div>
           </div>
         </div>
       </div>
     </section>
 
-    <!-- TAB 5: MODEL PERFORMANCE -->
+    <!-- ======================================================== -->
+    <!-- TAB 5: MODEL PERFORMANCE & AUDIT -->
+    <!-- ======================================================== -->
     <section id="tab-performance" class="space-y-6 hidden">
+      
       <!-- Performance Metrics Row -->
       <div class="grid grid-cols-2 md:grid-cols-5 gap-4">
-        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-blue-600">
-          <div class="text-xs uppercase text-slate-500 font-semibold">Accuracy</div>
-          <div id="perf-acc" class="text-2xl font-bold text-blue-700 mt-1">...</div>
-          <div class="text-[11px] text-slate-400 mt-0.5">Overall accuracy</div>
+        <div class="glass-card p-4 rounded-2xl border-l-4 border-blue-600">
+          <div class="text-[10.5px] uppercase text-slate-500 font-bold">Accuracy</div>
+          <div id="perf-acc" class="text-2xl font-extrabold text-blue-700 mt-1">...</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">Holdout test set</div>
         </div>
-        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-indigo-600">
-          <div class="text-xs uppercase text-slate-500 font-semibold">Precision</div>
-          <div id="perf-prec" class="text-2xl font-bold text-indigo-700 mt-1">...</div>
-          <div class="text-[11px] text-slate-400 mt-0.5">Weighted avg</div>
+        <div class="glass-card p-4 rounded-2xl border-l-4 border-indigo-600">
+          <div class="text-[10.5px] uppercase text-slate-500 font-bold">Precision</div>
+          <div id="perf-prec" class="text-2xl font-extrabold text-indigo-700 mt-1">...</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">Macro weighted</div>
         </div>
-        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-cyan-600">
-          <div class="text-xs uppercase text-slate-500 font-semibold">Recall</div>
-          <div id="perf-rec" class="text-2xl font-bold text-cyan-700 mt-1">...</div>
-          <div class="text-[11px] text-slate-400 mt-0.5">Weighted avg</div>
+        <div class="glass-card p-4 rounded-2xl border-l-4 border-cyan-600">
+          <div class="text-[10.5px] uppercase text-slate-500 font-bold">Recall</div>
+          <div id="perf-rec" class="text-2xl font-extrabold text-cyan-700 mt-1">...</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">Macro weighted</div>
         </div>
-        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-teal-600">
-          <div class="text-xs uppercase text-slate-500 font-semibold">F1 Score</div>
-          <div id="perf-f1" class="text-2xl font-bold text-teal-700 mt-1">...</div>
-          <div class="text-[11px] text-slate-400 mt-0.5">Harmonic mean</div>
+        <div class="glass-card p-4 rounded-2xl border-l-4 border-teal-600">
+          <div class="text-[10.5px] uppercase text-slate-500 font-bold">F1 Score</div>
+          <div id="perf-f1" class="text-2xl font-extrabold text-teal-700 mt-1">...</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">Balanced metric</div>
         </div>
-        <div class="bg-white p-4 rounded-xl shadow-sm border-l-4 border-slate-600">
-          <div class="text-xs uppercase text-slate-500 font-semibold">5-Fold CV F1</div>
-          <div id="perf-cv" class="text-xl font-bold text-slate-800 mt-1">...</div>
-          <div class="text-[11px] text-slate-400 mt-0.5">Stratified Cross-Val</div>
+        <div class="glass-card p-4 rounded-2xl border-l-4 border-slate-600">
+          <div class="text-[10.5px] uppercase text-slate-500 font-bold">5-Fold CV F1</div>
+          <div id="perf-cv" class="text-xl font-extrabold text-slate-800 mt-1">...</div>
+          <div class="text-[11px] text-slate-400 mt-0.5">Stratified cross-val</div>
         </div>
       </div>
 
       <!-- Charts: Confusion Matrix & Feature Importances -->
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-          <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-            <i class="fa-solid fa-table-cells text-blue-600"></i> Confusion Matrix Heatmap
+        <div class="glass-card p-6 rounded-2xl">
+          <h3 class="text-sm font-bold text-slate-800 mb-1 flex items-center gap-2">
+            <i class="fa-solid fa-table-cells text-blue-600"></i> Multi-Class Confusion Matrix
           </h3>
+          <p class="text-xs text-slate-500 mb-4">Actual vs. predicted risk level distribution</p>
           <div class="h-64"><canvas id="chart-cm"></canvas></div>
         </div>
-        <div class="bg-white p-5 rounded-xl shadow-sm border border-slate-200">
-          <h3 class="text-sm font-bold text-slate-700 mb-3 flex items-center gap-2">
-            <i class="fa-solid fa-ranking-star text-emerald-600"></i> Top Feature Importances
+
+        <div class="glass-card p-6 rounded-2xl">
+          <h3 class="text-sm font-bold text-slate-800 mb-1 flex items-center gap-2">
+            <i class="fa-solid fa-ranking-star text-emerald-600"></i> Gini Feature Importance Ranking
           </h3>
+          <p class="text-xs text-slate-500 mb-4">Relative contribution of spatio-temporal features</p>
           <div class="h-64"><canvas id="chart-features"></canvas></div>
         </div>
       </div>
 
       <!-- Retrain Action Banner -->
-      <div class="bg-gradient-to-r from-blue-900 to-slate-900 text-white p-6 rounded-xl shadow-md flex flex-col md:flex-row items-center justify-between gap-4">
+      <div class="bg-gradient-to-r from-slate-950 via-blue-950 to-slate-900 text-white p-6 rounded-2xl shadow-lg border border-slate-800/80 flex flex-col md:flex-row items-center justify-between gap-4">
         <div>
-          <h3 class="text-base font-bold">Re-train Random Forest Model</h3>
-          <p class="text-xs text-blue-200 mt-1">Re-runs stratified 75/25 split and 5-fold cross-validation on current data.</p>
+          <h3 class="text-base font-extrabold">Retrain & Benchmark Ensemble Model</h3>
+          <p class="text-xs text-slate-300 mt-1">Executes stratified 75/25 train-test split and 5-fold cross-validation on the active dataset.</p>
         </div>
         <div class="flex items-center gap-3">
-          <button onclick="retrainModel()" id="btn-retrain" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow transition flex items-center gap-2">
+          <button onclick="retrainModel()" id="btn-retrain" class="bg-blue-600 hover:bg-blue-500 text-white text-xs font-bold px-4 py-2.5 rounded-lg shadow-md transition flex items-center gap-2">
             <i class="fa-solid fa-arrows-rotate"></i> Re-train Model
           </button>
-          <a href="/api/export-report" class="bg-slate-700 hover:bg-slate-600 text-white text-xs font-semibold px-4 py-2.5 rounded-lg shadow transition">
-            Download Report (TXT)
+          <a href="/api/export-report" class="bg-slate-800 hover:bg-slate-700 text-white text-xs font-bold px-4 py-2.5 rounded-lg border border-slate-700 shadow-md transition">
+            Export Report (TXT)
           </a>
         </div>
       </div>
@@ -507,11 +735,11 @@
   <!-- ======================================================== -->
   <!-- Footer -->
   <!-- ======================================================== -->
-  <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">
-    <div class="max-w-7xl mx-auto px-4">
-      <p class="font-semibold text-slate-700">Geospatial Machine Learning Crime Hotspot Prediction Framework</p>
-      <p class="mt-1 text-slate-400">⚠️ All data is SYNTHETIC (computer-generated) for academic demonstration. Not for operational law enforcement use.</p>
-      <p class="mt-2 text-slate-400">Deployed on Vercel Serverless Architecture • Built with Python & Leaflet</p>
+  <footer class="bg-white border-t border-slate-200/80 py-6 text-center text-xs text-slate-500 mt-auto">
+    <div class="max-w-7xl mx-auto px-4 space-y-1.5">
+      <p class="font-bold text-slate-700">Geospatial Machine Learning Framework for Crime Hotspot Prediction</p>
+      <p class="text-[11px] text-slate-400">⚠️ All data is SYNTHETIC (computer-generated) for academic evaluation. Not for operational municipal policing.</p>
+      <p class="text-[11px] text-slate-400">Vercel Serverless Architecture • Random Forest & DBSCAN Engine</p>
     </div>
   </footer>
 
@@ -562,11 +790,11 @@
         document.getElementById('kpi-total').innerText = stats.total_records.toLocaleString();
         document.getElementById('kpi-categories').innerText = stats.total_categories;
         document.getElementById('kpi-high').innerText = stats.risk_high.toLocaleString();
-        document.getElementById('kpi-high-pct').innerText = `${stats.risk_high_pct}% of records`;
+        document.getElementById('kpi-high-pct').innerText = `${stats.risk_high_pct}% of total`;
         document.getElementById('kpi-med').innerText = stats.risk_medium.toLocaleString();
-        document.getElementById('kpi-med-pct').innerText = `${stats.risk_medium_pct}% of records`;
+        document.getElementById('kpi-med-pct').innerText = `${stats.risk_medium_pct}% of total`;
         document.getElementById('kpi-low').innerText = stats.risk_low.toLocaleString();
-        document.getElementById('kpi-low-pct').innerText = `${stats.risk_low_pct}% of records`;
+        document.getElementById('kpi-low-pct').innerText = `${stats.risk_low_pct}% of total`;
         document.getElementById('kpi-dates').innerText = `${stats.date_range[0]} – ${stats.date_range[1]}`;
 
         // Analytics charts
@@ -595,7 +823,7 @@
           datasets: [{
             label: 'Incidents',
             data: data.map(d => d.count),
-            backgroundColor: '#3b82f6',
+            backgroundColor: '#2563eb',
             borderRadius: 6
           }]
         },
@@ -604,7 +832,10 @@
           responsive: true,
           maintainAspectRatio: false,
           plugins: { legend: { display: false } },
-          scales: { x: { grid: { display: false } }, y: { grid: { display: false } } }
+          scales: {
+            x: { grid: { color: '#f1f5f9' } },
+            y: { grid: { display: false } }
+          }
         }
       });
     }
@@ -620,17 +851,22 @@
             label: 'Incidents',
             data: data.map(d => d.count),
             borderColor: '#2563eb',
-            backgroundColor: 'rgba(37, 99, 235, 0.1)',
+            backgroundColor: 'rgba(37, 99, 235, 0.12)',
             fill: true,
-            tension: 0.3,
-            borderWidth: 2
+            tension: 0.35,
+            borderWidth: 2.5,
+            pointRadius: 3,
+            pointHoverRadius: 6
           }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
           plugins: { legend: { display: false } },
-          scales: { x: { grid: { display: false } } }
+          scales: {
+            x: { grid: { color: '#f1f5f9' } },
+            y: { grid: { color: '#f1f5f9' } }
+          }
         }
       });
     }
@@ -644,14 +880,21 @@
           labels: ['High Risk', 'Medium Risk', 'Low Risk'],
           datasets: [{
             data: [stats.risk_high, stats.risk_medium, stats.risk_low],
-            backgroundColor: ['#ef4444', '#f97316', '#10b981'],
-            borderWidth: 2
+            backgroundColor: ['#ef4444', '#f59e0b', '#10b981'],
+            borderWidth: 3,
+            borderColor: '#ffffff'
           }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { position: 'bottom' } }
+          plugins: {
+            legend: {
+              position: 'bottom',
+              labels: { boxWidth: 12, font: { family: '"Plus Jakarta Sans"', size: 11 } }
+            }
+          },
+          cutout: '65%'
         }
       });
     }
@@ -665,14 +908,18 @@
           labels: data.map(d => `${d.hour}:00`),
           datasets: [{
             data: data.map(d => d.count),
-            backgroundColor: '#ea580c',
+            backgroundColor: '#f59e0b',
             borderRadius: 4
           }]
         },
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { display: false } }
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false } },
+            y: { grid: { color: '#f1f5f9' } }
+          }
         }
       });
     }
@@ -693,7 +940,11 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { display: false } }
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { display: false } },
+            y: { grid: { color: '#f1f5f9' } }
+          }
         }
       });
     }
@@ -702,12 +953,12 @@
       const tbody = document.getElementById('table-top-hotspots');
       tbody.innerHTML = locs.map((l, i) => `
         <tr class="hover:bg-slate-50 transition">
-          <td class="py-2.5 px-3 font-semibold text-slate-500">${i + 1}</td>
-          <td class="py-2.5 px-3 font-medium text-slate-800">${l.location}</td>
-          <td class="py-2.5 px-3 font-bold text-blue-700">${l.crime_count}</td>
-          <td class="py-2.5 px-3 text-slate-600">${l.top_crime}</td>
-          <td class="py-2.5 px-3">
-            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${l.crime_count >= 150 ? 'bg-red-100 text-red-700' : 'bg-orange-100 text-orange-700'}">
+          <td class="py-3 px-4 font-bold text-slate-400">#${i + 1}</td>
+          <td class="py-3 px-4 font-bold text-slate-800">${l.location}</td>
+          <td class="py-3 px-4 font-extrabold text-blue-600">${l.crime_count}</td>
+          <td class="py-3 px-4 text-slate-600 font-medium">${l.top_crime}</td>
+          <td class="py-3 px-4">
+            <span class="px-2.5 py-1 rounded-full text-[10px] font-extrabold uppercase tracking-wide ${l.crime_count >= 150 ? 'bg-rose-100 text-rose-700' : 'bg-amber-100 text-amber-700'}">
               ${l.crime_count >= 150 ? 'HIGH RISK' : 'ELEVATED'}
             </span>
           </td>
@@ -735,14 +986,14 @@
       const tbody = document.getElementById('table-analysis');
       tbody.innerHTML = data.records.map(r => `
         <tr class="hover:bg-slate-50 transition">
-          <td class="py-2 px-3 text-slate-700">${r.date}</td>
-          <td class="py-2 px-3 text-slate-600">${r.time || '12:00'}</td>
-          <td class="py-2 px-3 font-medium text-slate-900">${r.crime_type}</td>
-          <td class="py-2 px-3 text-slate-600">${r.location || 'Urban Grid'}</td>
-          <td class="py-2 px-3 font-mono text-[11px]">${r.latitude.toFixed(4)}</td>
-          <td class="py-2 px-3 font-mono text-[11px]">${r.longitude.toFixed(4)}</td>
-          <td class="py-2 px-3">
-            <span class="px-2 py-0.5 rounded text-[10px] font-bold ${r.risk_label === 2 ? 'bg-red-100 text-red-700' : r.risk_label === 1 ? 'bg-orange-100 text-orange-700' : 'bg-emerald-100 text-emerald-700'}">
+          <td class="py-2 px-3.5 text-slate-700">${r.date}</td>
+          <td class="py-2 px-3.5 text-slate-600">${r.time || '12:00'}</td>
+          <td class="py-2 px-3.5 font-bold text-slate-900">${r.crime_type}</td>
+          <td class="py-2 px-3.5 text-slate-600">${r.location || 'Urban Grid'}</td>
+          <td class="py-2 px-3.5 font-mono text-[11px] text-slate-500">${r.latitude.toFixed(4)}</td>
+          <td class="py-2 px-3.5 font-mono text-[11px] text-slate-500">${r.longitude.toFixed(4)}</td>
+          <td class="py-2 px-3.5">
+            <span class="px-2.5 py-0.5 rounded-full text-[10px] font-bold ${r.risk_label === 2 ? 'bg-rose-100 text-rose-700' : r.risk_label === 1 ? 'bg-amber-100 text-amber-700' : 'bg-emerald-100 text-emerald-700'}">
               ${r.risk_label === 2 ? 'High Risk' : r.risk_label === 1 ? 'Medium Risk' : 'Low Risk'}
             </span>
           </td>
@@ -757,25 +1008,25 @@
 
       const tbody = document.getElementById('table-clusters');
       if (data.clusters.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="5" class="py-3 text-center text-slate-400">No clusters found. Try increasing radius.</td></tr>';
+        tbody.innerHTML = '<tr><td colspan="5" class="py-4 text-center text-slate-400">No clusters found. Try increasing radius.</td></tr>';
         return;
       }
 
       tbody.innerHTML = data.clusters.map(c => `
         <tr class="hover:bg-slate-50 transition">
-          <td class="py-2 px-3 font-bold text-blue-600">#${c.cluster_id}</td>
-          <td class="py-2 px-3 font-bold">${c.crime_count} incidents</td>
-          <td class="py-2 px-3 font-mono">${c.lat_center.toFixed(4)}, ${c.lon_center.toFixed(4)}</td>
-          <td class="py-2 px-3 font-medium">${c.top_crime}</td>
-          <td class="py-2 px-3 font-bold ${c.risk_level === 'High' ? 'text-red-600' : 'text-orange-600'}">${c.risk_level}</td>
+          <td class="py-2.5 px-3.5 font-extrabold text-blue-600">#${c.cluster_id}</td>
+          <td class="py-2.5 px-3.5 font-bold text-slate-900">${c.crime_count} incidents</td>
+          <td class="py-2.5 px-3.5 font-mono text-[11px] text-slate-600">${c.lat_center.toFixed(4)}, ${c.lon_center.toFixed(4)}</td>
+          <td class="py-2.5 px-3.5 font-semibold text-slate-700">${c.top_crime}</td>
+          <td class="py-2.5 px-3.5 font-extrabold ${c.risk_level === 'High' ? 'text-rose-600' : 'text-amber-600'}">${c.risk_level}</td>
         </tr>
       `).join('');
 
-      // Also render on map
+      // Render on map
       if (clusterCirclesGroup) {
         clusterCirclesGroup.clearLayers();
         data.clusters.forEach(c => {
-          const color = c.risk_level === 'High' ? '#dc2626' : '#ea580c';
+          const color = c.risk_level === 'High' ? '#ef4444' : '#f59e0b';
           L.circle([c.lat_center, c.lon_center], {
             radius: Math.max(300, Math.min(c.crime_count * 25, 2000)),
             color: color,
@@ -795,12 +1046,14 @@
     // Tab 3: Interactive Hotspot Map
     async function initHotspotMap() {
       hotspotMap = L.map('hotspot-map').setView([40.7128, -74.0060], 12);
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        maxZoom: 18,
-        attribution: '© OpenStreetMap contributors'
+      
+      // Clean modern tile layer (CartoDB Positron / OSM fallback)
+      L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+        maxZoom: 19,
+        attribution: '© OpenStreetMap, © CARTO'
       }).addTo(hotspotMap);
 
-      heatLayer = L.heatLayer([], { radius: 18, blur: 14, maxZoom: 14 }).addTo(hotspotMap);
+      heatLayer = L.heatLayer([], { radius: 20, blur: 15, maxZoom: 14 }).addTo(hotspotMap);
       markerClusterGroup = L.markerClusterGroup().addTo(hotspotMap);
       clusterCirclesGroup = L.layerGroup().addTo(hotspotMap);
 
@@ -822,7 +1075,7 @@
       hotspotMap.setView(data.center, 12);
 
       // Heat points
-      const heatPoints = data.points.map(p => [p.latitude, p.longitude, 0.7]);
+      const heatPoints = data.points.map(p => [p.latitude, p.longitude, 0.75]);
       heatLayer.setLatLngs(heatPoints);
 
       // Marker Clusters
@@ -830,8 +1083,10 @@
       data.points.forEach(p => {
         const marker = L.circleMarker([p.latitude, p.longitude], {
           radius: 5,
-          color: p.risk_label === 2 ? '#ef4444' : p.risk_label === 1 ? '#f97316' : '#10b981',
-          fillOpacity: 0.7
+          color: p.risk_label === 2 ? '#ef4444' : p.risk_label === 1 ? '#f59e0b' : '#10b981',
+          fillColor: p.risk_label === 2 ? '#ef4444' : p.risk_label === 1 ? '#f59e0b' : '#10b981',
+          fillOpacity: 0.75,
+          weight: 1.5
         }).bindPopup(`<b>🚨 ${p.crime_type}</b><br>📍 ${p.location}<br>📅 ${p.date}<br>⚠️ Risk: <b>${p.risk_text}</b>`);
         markerClusterGroup.addLayer(marker);
       });
@@ -864,10 +1119,10 @@
 
       const isHigh = data.risk_level === 'High Risk';
       const isMed = data.risk_level === 'Medium Risk';
-      box.className = `p-4 rounded-lg border-l-4 ${isHigh ? 'bg-red-50 border-red-500' : isMed ? 'bg-orange-50 border-orange-500' : 'bg-emerald-50 border-emerald-500'}`;
+      box.className = `p-4 rounded-xl border-l-4 ${isHigh ? 'bg-rose-50/80 border-rose-500' : isMed ? 'bg-amber-50/80 border-amber-500' : 'bg-emerald-50/80 border-emerald-500'}`;
 
       document.getElementById('search-result-risk').innerText = data.risk_level;
-      document.getElementById('search-result-risk').className = `text-xl font-bold mt-1 ${isHigh ? 'text-red-700' : isMed ? 'text-orange-700' : 'text-emerald-700'}`;
+      document.getElementById('search-result-risk').className = `text-xl font-extrabold mt-1 ${isHigh ? 'text-rose-700' : isMed ? 'text-amber-700' : 'text-emerald-700'}`;
       document.getElementById('search-result-conf').innerText = `${Math.round(data.confidence * 100)}%`;
       document.getElementById('search-result-count').innerText = `${data.crime_count} incidents`;
       document.getElementById('search-result-top').innerText = data.top_crime;
@@ -876,7 +1131,7 @@
       if (searchedMarker) hotspotMap.removeLayer(searchedMarker);
       if (searchedCircle) hotspotMap.removeLayer(searchedCircle);
 
-      searchedMarker = L.marker([lat, lon]).addTo(hotspotMap).bindPopup(`<b>Analyzed Location</b><br>${data.risk_level}`).openPopup();
+      searchedMarker = L.marker([lat, lon]).addTo(hotspotMap).bindPopup(`<b>Analyzed Target Location</b><br>${data.risk_level}`).openPopup();
       searchedCircle = L.circle([lat, lon], { radius: radius * 1000, color: isHigh ? '#dc2626' : '#2563eb', fillOpacity: 0.15 }).addTo(hotspotMap);
       hotspotMap.setView([lat, lon], 13);
     }
@@ -903,10 +1158,10 @@
       document.getElementById('pred-ml-risk').style.color = ml.color;
       document.getElementById('card-ml').style.borderLeftColor = ml.color;
       document.getElementById('pred-ml-probs').innerHTML = `
-        <div>Confidence: <b>${Math.round(ml.confidence * 100)}%</b></div>
-        <div>P(Low): ${(ml.probability_low * 100).toFixed(0)}%</div>
-        <div>P(Med): ${(ml.probability_medium * 100).toFixed(0)}%</div>
-        <div>P(High): ${(ml.probability_high * 100).toFixed(0)}%</div>
+        <div class="flex justify-between"><span>Confidence:</span> <b>${Math.round(ml.confidence * 100)}%</b></div>
+        <div class="flex justify-between"><span>P(Low):</span> <span>${(ml.probability_low * 100).toFixed(0)}%</span></div>
+        <div class="flex justify-between"><span>P(Med):</span> <span>${(ml.probability_medium * 100).toFixed(0)}%</span></div>
+        <div class="flex justify-between"><span>P(High):</span> <span>${(ml.probability_high * 100).toFixed(0)}%</span></div>
       `;
 
       // Geo Card
@@ -915,9 +1170,9 @@
       document.getElementById('pred-geo-risk').style.color = geo.risk_level === 'High Risk' ? '#dc2626' : '#ea580c';
       document.getElementById('card-geo').style.borderLeftColor = geo.risk_level === 'High Risk' ? '#dc2626' : '#ea580c';
       document.getElementById('pred-geo-info').innerHTML = `
-        <div>Confidence: <b>${Math.round(geo.confidence * 100)}%</b></div>
-        <div>Nearby Incidents: <b>${geo.crime_count}</b></div>
-        <div>Dominant Crime: <b>${geo.top_crime}</b></div>
+        <div class="flex justify-between"><span>Confidence:</span> <b>${Math.round(geo.confidence * 100)}%</b></div>
+        <div class="flex justify-between"><span>Buffer Incidents:</span> <b>${geo.crime_count}</b></div>
+        <div class="flex justify-between"><span>Dominant Type:</span> <b>${geo.top_crime}</b></div>
       `;
 
       // Combined Card
@@ -926,18 +1181,21 @@
       document.getElementById('pred-comb-risk').style.color = comb.color;
       document.getElementById('card-combined').style.borderLeftColor = comb.color;
       document.getElementById('pred-comb-info').innerHTML = `
-        <div>Combined Risk Score: <b>${comb.score.toFixed(1)} / 2.0</b></div>
-        <div class="mt-1">Evaluated at coordinates (${lat.toFixed(4)}, ${lon.toFixed(4)})</div>
+        <div class="font-bold">Combined Score: ${comb.score.toFixed(1)} / 2.0</div>
+        <div class="text-[11px] text-slate-500 mt-1">Evaluated at coordinates (${lat.toFixed(4)}, ${lon.toFixed(4)})</div>
       `;
 
       // Minimap
       if (!minimap) {
         minimap = L.map('pred-minimap').setView([lat, lon], 13);
-        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png').addTo(minimap);
+        L.tileLayer('https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png', {
+          maxZoom: 19,
+          attribution: '© OpenStreetMap, © CARTO'
+        }).addTo(minimap);
       } else {
         minimap.setView([lat, lon], 13);
       }
-      L.circleMarker([lat, lon], { radius: 8, color: comb.color, fillColor: comb.color, fillOpacity: 0.8 }).addTo(minimap);
+      L.circleMarker([lat, lon], { radius: 8, color: comb.color, fillColor: comb.color, fillOpacity: 0.85 }).addTo(minimap);
       L.circle([lat, lon], { radius: 1000, color: comb.color, fillOpacity: 0.15 }).addTo(minimap);
     }
 
@@ -970,7 +1228,10 @@
         options: {
           responsive: true,
           maintainAspectRatio: false,
-          scales: { x: { stacked: true }, y: { stacked: true } }
+          scales: {
+            x: { stacked: true, grid: { display: false } },
+            y: { stacked: true, grid: { color: '#f1f5f9' } }
+          }
         }
       });
 
@@ -985,22 +1246,26 @@
           datasets: [{
             label: 'Importance',
             data: fiItems.map(x => x[1]),
-            backgroundColor: '#10b981',
-            borderRadius: 4
+            backgroundColor: '#059669',
+            borderRadius: 5
           }]
         },
         options: {
           indexAxis: 'y',
           responsive: true,
           maintainAspectRatio: false,
-          plugins: { legend: { display: false } }
+          plugins: { legend: { display: false } },
+          scales: {
+            x: { grid: { color: '#f1f5f9' } },
+            y: { grid: { display: false } }
+          }
         }
       });
     }
 
     async function retrainModel() {
       const btn = document.getElementById('btn-retrain');
-      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Training...';
+      btn.innerHTML = '<i class="fa-solid fa-spinner fa-spin"></i> Retraining Model...';
       btn.disabled = true;
 
       try {

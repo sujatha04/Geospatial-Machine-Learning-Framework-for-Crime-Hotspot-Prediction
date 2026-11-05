@@ -15,6 +15,7 @@ from streamlit_folium import st_folium
 from utils.helpers import (
     init_session_state, page_header, metric_card, no_data_warning,
     get_data_path, load_sample_data_cached, ensure_src_on_path, risk_badge,
+    apply_custom_css,
 )
 
 ensure_src_on_path()
@@ -24,10 +25,15 @@ from src.geospatial_analysis import (
 )
 from src.visualization import build_crime_map, add_location_marker
 
-st.set_page_config(page_title="Hotspot Map", page_icon="🗺", layout="wide")
+st.set_page_config(page_title="Hotspot Map | GeoCrime AI", page_icon="🗺", layout="wide")
 init_session_state()
+apply_custom_css()
 
-page_header("Crime Hotspot Map")
+page_header(
+    title="Interactive Geospatial Hotspot Map",
+    subtitle="High-density kernel heatmaps, multi-layer marker clustering, and on-demand radial point risk querying.",
+    badge="Cartographic View"
+)
 
 # Auto-load sample data if needed
 df = st.session_state.get("df_processed")
@@ -46,10 +52,10 @@ if df is None:
 # Sidebar Map Controls
 # ---------------------------------------------------------------------------
 with st.sidebar:
-    st.markdown("### 🗺 Map Controls")
+    st.markdown("### 🗺 Map Layer Controls")
 
     crime_types = ["All"] + sorted(df["crime_type"].unique().tolist())
-    crime_filter = st.selectbox("Filter by Crime Type", crime_types, key="map_crime_filter")
+    crime_filter = st.selectbox("Filter Crime Modality", crime_types, key="map_crime_filter")
 
     date_min = df["date"].min().date()
     date_max = df["date"].max().date()
@@ -61,18 +67,18 @@ with st.sidebar:
         key="map_date_range",
     )
 
-    show_heatmap   = st.checkbox("Show Heatmap", value=True)
-    show_markers   = st.checkbox("Show Crime Markers", value=True)
-    show_clusters  = st.checkbox("Show Clusters", value=True)
+    show_heatmap   = st.checkbox("🌡 Density Heatmap Layer", value=True)
+    show_markers   = st.checkbox("📍 Crime Incidents Cluster", value=True)
+    show_clusters  = st.checkbox("🔵 DBSCAN Cluster Centroids", value=True)
 
     st.markdown("---")
-    st.markdown("### 🔍 Location Search")
+    st.markdown("### 🔍 Point Radius Assessment")
     search_lat = st.number_input("Latitude",  value=float(df["latitude"].mean()),
                                  format="%.5f", key="search_lat")
     search_lon = st.number_input("Longitude", value=float(df["longitude"].mean()),
                                  format="%.5f", key="search_lon")
-    search_radius = st.slider("Search Radius (km)", 0.5, 10.0, 1.0, 0.5)
-    do_search = st.button("🔍 Analyse Location", type="primary")
+    search_radius = st.slider("Radial Buffer (km)", 0.5, 10.0, 1.0, 0.5)
+    do_search = st.button("⚡ Query Location Risk", type="primary")
 
 # ---------------------------------------------------------------------------
 # Filter data
@@ -89,7 +95,7 @@ if len(map_date_range) == 2:
 # ---------------------------------------------------------------------------
 cluster_summary = st.session_state.get("cluster_summary")
 if cluster_summary is None:
-    with st.spinner("Running clustering…"):
+    with st.spinner("Computing spatial clusters…"):
         df_clustered = run_dbscan(df, eps_km=0.5, min_samples=5)
         cluster_summary = get_cluster_summary(df_clustered)
         st.session_state["df_clustered"] = df_clustered
@@ -100,25 +106,25 @@ if cluster_summary is None:
 # ---------------------------------------------------------------------------
 m1, m2, m3, m4 = st.columns(4)
 with m1:
-    metric_card("Mapped Records", f"{len(filtered_df):,}", "after filters", "#1565c0")
+    metric_card("Rendered Points", f"{len(filtered_df):,}", "Active on map", "#2563eb", icon="📌")
 with m2:
-    metric_card("Crime Clusters", len(cluster_summary) if cluster_summary is not None else 0,
-                "DBSCAN clusters", "#1976d2")
+    metric_card("DBSCAN Epicenters", len(cluster_summary) if cluster_summary is not None else 0,
+                "Spatial clusters", "#0284c7", icon="🎯")
 with m3:
-    metric_card("Map Centre",
+    metric_card("Geographic Centroid",
                 f"{filtered_df['latitude'].mean():.3f}, {filtered_df['longitude'].mean():.3f}",
-                "", "#37474f")
+                "Grid center", "#475569", icon="🌐")
 with m4:
-    high_cl = (cluster_summary["risk_level"] == "High").sum() if cluster_summary is not None else 0
-    metric_card("High-Risk Clusters", high_cl, "", "#c62828")
+    high_cl = (cluster_summary["risk_level"].isin(["High", "High Risk"])).sum() if cluster_summary is not None else 0
+    metric_card("High-Risk Hotspots", high_cl, "Immediate attention", "#dc2626", icon="🚨")
 
-st.markdown("---")
+st.write("")
 
 # ---------------------------------------------------------------------------
 # Location search result
 # ---------------------------------------------------------------------------
 if do_search:
-    with st.spinner("Analysing nearby crimes…"):
+    with st.spinner("Executing spatial radius query…"):
         nearby = get_nearby_crimes(df, search_lat, search_lon, radius_km=search_radius)
         search_result = location_risk_summary(nearby)
         st.session_state["search_result"] = search_result
@@ -133,22 +139,22 @@ if search_result and search_coords:
     with col_res1:
         risk = search_result["risk_level"]
         color_map = {
-            "High Risk": "#d32f2f", "High": "#d32f2f",
-            "Medium Risk": "#e65100", "Medium": "#e65100",
-            "Low Risk": "#2e7d32", "Low": "#2e7d32"
+            "High Risk": "#dc2626", "High": "#dc2626",
+            "Medium Risk": "#d97706", "Medium": "#d97706",
+            "Low Risk": "#16a34a", "Low": "#16a34a"
         }
-        c = color_map.get(risk, "#555")
+        c = color_map.get(risk, "#475569")
         st.markdown(
             f"""
-            <div style='background:{c}22;border-left:4px solid {c};
-                        border-radius:8px;padding:16px 20px'>
-                <div style='font-size:11px;color:#555;font-weight:600'>LOCATION RISK ASSESSMENT</div>
-                <div style='font-size:24px;font-weight:700;color:{c}'>{risk}</div>
-                <div style='font-size:13px;color:#333'>
-                    📊 Confidence: <b>{search_result['confidence']:.0%}</b><br>
-                    🔢 Nearby Crimes: <b>{search_result['crime_count']}</b><br>
-                    🏆 Top Crime: <b>{search_result['top_crime']}</b><br>
-                    📏 Radius: <b>{s_rad} km</b>
+            <div style='background: white; border: 1px solid #e2e8f0; border-left: 5px solid {c};
+                        border-radius: 12px; padding: 18px 22px; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.05);'>
+                <div style='font-size: 11px; color: #64748b; font-weight: 700; text-transform: uppercase;'>SPATIAL RISK ASSESSMENT</div>
+                <div style='font-size: 26px; font-weight: 800; color: {c}; margin: 4px 0 8px 0;'>{risk}</div>
+                <div style='font-size: 13px; color: #334155; line-height: 1.6;'>
+                    🎯 Assessment Confidence: <b>{search_result['confidence']:.0%}</b><br>
+                    🔢 Incidents within Buffer: <b>{search_result['crime_count']}</b><br>
+                    🏷️ Dominant Crime: <b>{search_result['top_crime']}</b><br>
+                    📏 Search Radius: <b>{s_rad} km</b>
                 </div>
             </div>
             """,
@@ -163,21 +169,22 @@ if search_result and search_coords:
             ).sort_values("Count", ascending=False)
             fig = px.bar(
                 breakdown_df, x="Count", y="Crime Type", orientation="h",
-                color="Count", color_continuous_scale="Reds", height=250,
-                title=f"Crimes within {s_rad} km radius",
+                color="Count", color_continuous_scale="Reds", height=240,
+                title=f"Incident Breakdown ({s_rad} km radius)",
+                template="plotly_white"
             )
-            fig.update_layout(showlegend=False, plot_bgcolor="white",
-                              margin=dict(l=0, r=0, t=30, b=0))
+            fig.update_layout(showlegend=False, margin=dict(l=0, r=10, t=30, b=0),
+                              plot_bgcolor="rgba(248,250,252,0.6)", paper_bgcolor="white")
             st.plotly_chart(fig, use_container_width=True)
 
-    st.markdown("---")
+    st.write("")
 
 # ---------------------------------------------------------------------------
 # Build and display map
 # ---------------------------------------------------------------------------
-st.markdown("### 🗺 Interactive Map")
+st.markdown("### 🗺 Geospatial Map Visualization")
 
-with st.spinner("Building interactive map…"):
+with st.spinner("Rendering vector tiles and heat layers…"):
     m = build_crime_map(
         df=filtered_df,
         cluster_df=cluster_summary if show_clusters else None,
@@ -200,17 +207,17 @@ if map_data and map_data.get("last_clicked"):
     nearby = get_nearby_crimes(df, clicked_lat, clicked_lon, radius_km=0.5)
     result = location_risk_summary(nearby)
     st.info(
-        f"📍 Clicked: ({clicked_lat:.4f}, {clicked_lon:.4f}) — "
-        f"**{result['risk_level']}** | {result['crime_count']} crimes within 0.5 km"
+        f"📍 Selected Coordinates: ({clicked_lat:.4f}, {clicked_lon:.4f}) — "
+        f"**{result['risk_level']}** | {result['crime_count']} historical crimes detected within 0.5 km radius."
     )
 
 # ---------------------------------------------------------------------------
 # Cluster table below map
 # ---------------------------------------------------------------------------
 if cluster_summary is not None and len(cluster_summary) > 0:
-    with st.expander("📋 View Cluster Details", expanded=False):
+    with st.expander("📋 Inspect Cluster Telemetry Details", expanded=False):
         cols = [c for c in ["cluster_id","crime_count","lat_center","lon_center","top_crime","risk_level"]
                 if c in cluster_summary.columns]
         st.dataframe(cluster_summary[cols], use_container_width=True)
 
-st.caption("⚠️ All data is SYNTHETIC — for academic/demonstration purposes only.")
+st.caption("⚠️ All coordinates and incidents are synthetic — for research and academic evaluation.")

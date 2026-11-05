@@ -17,7 +17,7 @@ PROJECT_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 if PROJECT_ROOT not in sys.path:
     sys.path.insert(0, PROJECT_ROOT)
 
-from flask import Flask, request, jsonify, Response
+from flask import Flask, request, jsonify, Response, send_from_directory
 from flask_cors import CORS
 import pandas as pd
 import numpy as np
@@ -97,6 +97,19 @@ def get_trained_model():
         DATA_CACHE["train_results"] = res
 
     return DATA_CACHE["model"], DATA_CACHE["scaler"], DATA_CACHE["train_results"]
+
+
+# ---------------------------------------------------------------------------
+# Frontend Static Routing (for local running & standalone servers)
+# ---------------------------------------------------------------------------
+
+@app.route("/", defaults={"path": ""})
+@app.route("/<path:path>")
+def serve_frontend(path):
+    public_dir = os.path.join(PROJECT_ROOT, "public")
+    if path != "" and os.path.exists(os.path.join(public_dir, path)):
+        return send_from_directory(public_dir, path)
+    return send_from_directory(public_dir, "index.html")
 
 
 # ---------------------------------------------------------------------------
@@ -416,3 +429,4 @@ def export_report():
 
 if __name__ == "__main__":
     app.run(host="0.0.0.0", port=5000, debug=True)
+
